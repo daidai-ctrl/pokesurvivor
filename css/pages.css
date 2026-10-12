@@ -27,6 +27,7 @@ main { padding: 24px 16px 40px; }
 .doc { max-width: 820px; margin: 0 auto; background: linear-gradient(180deg, var(--box1), var(--box2)); border: 3px solid var(--edge);
   border-radius: 12px; box-shadow: 0 0 0 3px #0b1838, 0 18px 50px rgba(0,0,0,.5); padding: 26px clamp(16px, 4vw, 34px); }
 .doc.wide { max-width: 1180px; }
+.doc > img { display: block; width: 100%; max-width: 100%; height: auto; }
 .doc.center { text-align: center; }
 .lead { font-size: 19px; color: #e6eeff; }
 .doc li { margin: 6px 0; }

@@ -26,7 +26,7 @@ G.Net = (() => {
   const DIRECT_TIMEOUT = 9000;     // ms para conseguir canal directo antes de usar el relé
 
   // ---------------- TURN (Cloudflare) ----------------
-  const TURN_URL = 'https://turn.pokesurvivor.com/';
+  const TURN_URL = 'https://turn.pokesurvivor.xyz/';
   let turn = null, turnAt = 0, turnReq = null;
   /** Pide (o reutiliza) credenciales TURN. Nunca falla: sin ellas, se sigue como antes. */
   function fetchTurn() {

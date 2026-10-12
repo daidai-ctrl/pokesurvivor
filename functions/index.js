@@ -20,7 +20,7 @@
 // las cuentas (pasó el 11-10-2026 durante 5 minutos).
 const functions = require('firebase-functions/v1');
 
-const URL = 'https://turn.pokesurvivor.com/mau/new';
+const URL = 'https://turn.pokesurvivor.xyz/mau/new';
 const MSG = 'Este mes ya no quedan plazas para cuentas nuevas. Mientras, puedes jugar como invitado.';
 // "zzcerrado" en el formato de nombre interno del juego (hexadecimal del nombre en minúsculas).
 const TEST_PREFIX = Buffer.from('zzcerrado').toString('hex');

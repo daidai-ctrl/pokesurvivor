@@ -87,7 +87,7 @@ jefe, la captura de un shiny salvaje y un shiny en el gacha.
 - **Jugar con amigos (hasta 4) y ranking:** con cuenta en la nube, menú
   **Amigos** (añadir por apodo, invitar a tu sala) y **Ranking** (tiempo
   aguantado: solo o grupo, de hoy a histórico, amigos, por Pokémon).
-- **Publicar gratis en GitHub Pages:** [docs/PUBLICAR.md](docs/PUBLICAR.md).
+- **Publicar gratis en Cloudflare Pages:** el repositorio de GitHub es la fuente de código y `pokesurvivor.xyz` se sirve desde Cloudflare Pages; consulta [docs/DEPLOYMENT_ZH.md](docs/DEPLOYMENT_ZH.md).
 - Si se juega en dos ordenadores a la vez o sin conexión, las partidas se
   **fusionan**: las colecciones se unen (nunca se pierde un Pokémon ni un
   shiny), mejoras y estadísticas se quedan con el máximo, y monedas y

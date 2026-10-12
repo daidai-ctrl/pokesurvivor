@@ -9,7 +9,7 @@ y después 0,05 $ por GB.
 Piezas:
 - `cloudflare/turn-worker.js`: un Worker de Cloudflare (gratis) que da claves TURN
   temporales sólo a jugadores con cuenta (comprueba su token de Firebase).
-- `js/net/net.js`: el juego pide las claves a `https://turn.pokesurvivor.com/` al
+- `js/net/net.js`: el juego pide las claves a `https://turn.pokesurvivor.xyz/` al
   entrar en una sala. Si el Worker no responde, todo sigue como antes.
 
 ## Pasos (en https://dash.cloudflare.com)
@@ -32,9 +32,9 @@ Piezas:
 3. Otra vez **Add**: tipo **Secret**, nombre `TURN_KEY_API_TOKEN`, valor: el *API Token*.
 4. **Deploy** si te lo pide.
 
-### 4. Ponerle la dirección turn.pokesurvivor.com
+### 4. Ponerle la dirección turn.pokesurvivor.xyz
 1. En el Worker: **Settings** → **Domains & Routes** → **Add** → **Custom domain**.
-2. Escribe `turn.pokesurvivor.com` → **Add domain**. Cloudflare crea solo el registro DNS
+2. Escribe `turn.pokesurvivor.xyz` → **Add domain**. Cloudflare crea solo el registro DNS
    (no hay que tocar los registros de GitHub).
 
 Cuando esté, avisa: se comprueba que el Worker da claves y se sube el juego.

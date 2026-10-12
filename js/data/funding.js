@@ -13,7 +13,7 @@ G.Funding = {
   sponsors: 'JPTER78',
   costs: [
     ['Servidores (partidas, cuentas, ranking y multijugador)', 'Según cuánta gente juegue'],
-    ['Dominio pokesurvivor.com', '≈12 € al año']
+    ['Dominio pokesurvivor.xyz', '≈12 € al año']
   ],
   get url() { return this.kofi ? 'https://ko-fi.com/' + this.kofi : ''; }
 };

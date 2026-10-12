@@ -1,4 +1,4 @@
-# Páginas para buscadores, en español y en inglés.
+# Páginas para buscadores, en español, inglés y chino tradicional.
 #   node tools/export_data.js && python tools/make_seo_pages.py
 # Son páginas de texto de verdad (el juego es un canvas que Google no puede leer)
 # hechas con los datos del propio juego, y enlazan al juego. Genera:
@@ -8,7 +8,7 @@
 import json, os, re, datetime, html
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
-SITE = 'https://pokesurvivor.com/'
+SITE = 'https://pokesurvivor.xyz/'
 TODAY = datetime.date.today().isoformat()
 D = json.load(open(os.path.join(ROOT, 'tools', 'cache', 'gamedata.json'), encoding='utf-8'))
 DEX = D['dex']; BY = {p['dex']: p for p in DEX}
@@ -46,19 +46,29 @@ def tbadge(t, lang): return f'<i class="ty" style="background:{TC.get(t, "#888")
 LEG = set(D['legends'])
 
 # ---------------- rutas ----------------
-PAGES = ['home', 'guide', 'pokedex', 'legends', 'shinies', 'types', 'moves', 'items', 'achievements', 'news', 'support']
+PAGES = ['home', 'play', 'guide', 'pokedex', 'legends', 'shinies', 'types', 'moves', 'items', 'achievements', 'news', 'support']
 PATH = {
-    'es': {'home': '', 'guide': 'guia/', 'pokedex': 'pokedex/', 'legends': 'legendarios/', 'shinies': 'shinies/', 'types': 'tipos/',
+    'es': {'home': '', 'play': 'juego-supervivencia-pokemon-gratis-online/', 'guide': 'guia/', 'pokedex': 'pokedex/', 'legends': 'legendarios/', 'shinies': 'shinies/', 'types': 'tipos/',
            'moves': 'movimientos/', 'items': 'objetos/', 'achievements': 'logros/', 'news': 'novedades/', 'support': 'apoyar/'},
-    'en': {'home': 'en/', 'guide': 'en/guide/', 'pokedex': 'en/pokedex/', 'legends': 'en/legendaries/', 'shinies': 'en/shinies/', 'types': 'en/types/',
+    'en': {'home': 'en/', 'play': 'en/pokemon-survivor-play-free-online-in-your-browser/', 'guide': 'en/guide/', 'pokedex': 'en/pokedex/', 'legends': 'en/legendaries/', 'shinies': 'en/shinies/', 'types': 'en/types/',
            'moves': 'en/moves/', 'items': 'en/items/', 'achievements': 'en/achievements/', 'news': 'en/news/', 'support': 'en/support/'},
+    'zh-hant': {'home': 'zh-hant/', 'play': 'zh-hant/pokemon-survivor/', 'guide': 'zh-hant/guide/'},
 }
 NAV = {'es': [('guide', 'Guía'), ('pokedex', 'Pokédex'), ('legends', 'Legendarios'), ('moves', 'Movimientos'), ('types', 'Tipos')],
-       'en': [('guide', 'Guide'), ('pokedex', 'Pokédex'), ('legends', 'Legendaries'), ('moves', 'Moves'), ('types', 'Types')]}
+       'en': [('guide', 'Guide'), ('pokedex', 'Pokédex'), ('legends', 'Legendaries'), ('moves', 'Moves'), ('types', 'Types')],
+       'zh-hant': [('guide', '遊戲指南')]}
 FOOT = {'es': [('guide', 'Guía'), ('pokedex', 'Pokédex'), ('legends', 'Legendarios y arenas'), ('shinies', 'Shinies'), ('types', 'Tabla de tipos'),
                ('moves', 'Movimientos'), ('items', 'Objetos'), ('achievements', 'Logros'), ('news', 'Novedades'), ('support', 'Apoyar el proyecto')],
         'en': [('guide', 'Guide'), ('pokedex', 'Pokédex'), ('legends', 'Legendaries & arenas'), ('shinies', 'Shinies'), ('types', 'Type chart'),
-               ('moves', 'Moves'), ('items', 'Items'), ('achievements', 'Achievements'), ('news', 'News'), ('support', 'Support the project')]}
+               ('moves', 'Moves'), ('items', 'Items'), ('achievements', 'Achievements'), ('news', 'News'), ('support', 'Support the project')],
+        'zh-hant': [('play', '開始遊玩'), ('guide', '遊戲指南')]}
+
+LOCALE = {'es': 'es', 'en': 'en', 'zh-hant': 'zh-Hant'}
+LANG_LABEL = {'es': 'Español', 'en': 'English', 'zh-hant': '繁體中文'}
+ZH_PAGES = {'home', 'play', 'guide'}
+
+def langs_for(pid):
+    return ('es', 'en', 'zh-hant') if pid in ZH_PAGES else ('es', 'en')
 
 def rel(frm, to):
     """Ruta relativa entre dos páginas (las dos son carpetas)."""
@@ -67,14 +77,13 @@ def rel(frm, to):
 
 def page(pid, lang, title, desc, body, ld=None):
     me = PATH[lang][pid]
-    other = 'en' if lang == 'es' else 'es'
     up = '../' * me.count('/')
-    alts = ''.join(f'<link rel="alternate" hreflang="{l}" href="{SITE}{PATH[l][pid]}">\n' for l in ('es', 'en'))
+    alts = ''.join(f'<link rel="alternate" hreflang="{LOCALE[l]}" href="{SITE}{PATH[l][pid]}">\n' for l in langs_for(pid))
     alts += f'<link rel="alternate" hreflang="x-default" href="{SITE}{PATH["es"][pid]}">\n'
     nav = ''.join(f'<a href="{rel(me, PATH[lang][p])}">{esc(t)}</a>' for p, t in NAV[lang])
     foot = ' · '.join(f'<a href="{rel(me, PATH[lang][p])}">{esc(t)}</a>' for p, t in FOOT[lang])
-    play = 'Jugar gratis' if lang == 'es' else 'Play free'
-    switch = f'<a class="lang" hreflang="{other}" href="{rel(me, PATH[other][pid])}">{"English" if lang == "es" else "Español"}</a>'
+    play = {'es': 'Jugar gratis', 'en': 'Play free', 'zh-hant': '免費遊玩'}[lang]
+    switch = ' · '.join(f'<a class="lang" hreflang="{LOCALE[l]}" href="{rel(me, PATH[l][pid])}">{LANG_LABEL[l]}</a>' for l in langs_for(pid) if l != lang)
     legal = ('PokéSurvivor es un juego de fans <b>gratuito y sin ánimo de lucro</b>, sin anuncios ni compras (sólo donaciones voluntarias para los servidores). No está afiliado a Nintendo, Creatures, '
              'GAME FREAK ni The Pokémon Company; Pokémon y sus personajes son propiedad de sus respectivos dueños. Sprites de PMD SpriteCollab '
              '(CC BY-NC 4.0) · datos de PokéAPI · música y sonidos originales. No tiene ninguna criptomoneda ni token oficial: '
@@ -82,10 +91,11 @@ def page(pid, lang, title, desc, body, ld=None):
              'PokéSurvivor is a <b>free, non-profit</b> fan game with no ads or purchases (only voluntary donations for the servers). It is not affiliated with Nintendo, Creatures, GAME FREAK '
              'or The Pokémon Company; Pokémon and its characters are owned by their respective owners. Sprites from PMD SpriteCollab (CC BY-NC 4.0) '
              '· data from PokéAPI · original music and sounds. It has no official cryptocurrency or token: any using its name '
-             'belongs to third parties and we take no responsibility for purchases or investments.')
+             'belongs to third parties and we take no responsibility for purchases or investments.') if lang == 'en' else (
+             'PokéSurvivor 是一款<b>免費且非營利</b>的粉絲遊戲，不含廣告或付費內容（自願捐款僅用於伺服器）。本作與 Nintendo、Creatures、GAME FREAK 或 The Pokémon Company 無關；Pokémon 與相關角色歸其各自權利人所有。素材來自 PMD SpriteCollab（CC BY-NC 4.0），資料來自 PokéAPI，音樂與音效為原創。' if lang == 'zh-hant' else '')
     ldj = ('<script type="application/ld+json">\n' + json.dumps(ld, ensure_ascii=False) + '\n</script>') if ld else ''
     return f'''<!doctype html>
-<html lang="{lang}">
+<html lang="{LOCALE[lang]}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -95,7 +105,7 @@ def page(pid, lang, title, desc, body, ld=None):
 {alts}<meta name="theme-color" content="#0a1430">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PokéSurvivor">
-<meta property="og:locale" content="{'es_ES' if lang == 'es' else 'en_US'}">
+<meta property="og:locale" content="{'es_ES' if lang == 'es' else ('zh_TW' if lang == 'zh-hant' else 'en_US')}">
 <meta property="og:url" content="{SITE}{me}">
 <meta property="og:title" content="{esc(title)}">
 <meta property="og:description" content="{esc(desc)}">
@@ -106,7 +116,7 @@ def page(pid, lang, title, desc, body, ld=None):
 <link rel="icon" type="image/png" sizes="96x96" href="{up}assets/icons/icon-96.png">
 <link rel="icon" type="image/png" sizes="144x144" href="{up}assets/icons/icon-144.png">
 <link rel="apple-touch-icon" href="{up}assets/icons/icon-180.png">
-<link rel="stylesheet" href="{up}css/pages.css">
+<link rel="stylesheet" href="{up}css/pages.css?v=20261012">
 {ldj}
 </head>
 <body>
@@ -147,6 +157,136 @@ def sprite(d, shiny=False, up='../', anim='Idle'):
 def upof(pid, lang): return '../' * PATH[lang][pid].count('/')
 def cta(pid, lang, text):
     return f'<p class="cta"><a class="btn" href="{rel(PATH[lang][pid], PATH[lang]["home"])}">{esc(text)}</a></p>'
+
+# ================= SEO landing page =================
+def play_page(lang):
+    pid = 'play'
+    if lang == 'es':
+        h1 = 'Juego de supervivencia Pokémon gratis online en tu navegador'
+        title = 'Juego de supervivencia Pokémon gratis online | PokéSurvivor'
+        desc = 'Juego de supervivencia Pokémon gratis online en tu navegador: ataques automáticos, mejoras roguelike, móvil y cooperativo con PokéSurvivor.'
+        body = f'''<article class="doc wide">
+<h1>{h1}</h1>
+<p class="lead">PokéSurvivor es un <b>juego de supervivencia con Pokémon</b> que puedes jugar gratis online en tu navegador, sin descargas. Elige un compañero, esquiva hordas, consigue experiencia y mejora tus movimientos mientras intentas sobrevivir cada vez más.</p>
+<img src="../assets/og-image.jpg" alt="Escena pixel art de un juego de supervivencia Pokémon" loading="lazy" width="1200" height="630">
+<p class="note"><time datetime="{TODAY}">Actualizado: {TODAY}</time></p>
+{cta(pid, lang, 'Jugar ahora gratis')}
+<h2>Juego de supervivencia Pokémon gratis online: cómo se juega</h2>
+<p>Tu Pokémon ataca automáticamente con el movimiento activo. Tú decides dónde moverte, cuándo cambiar de ataque y qué mejoras elegir al subir de nivel. Las partidas combinan acción, exploración y decisiones roguelike.</p>
+<h2>Pokémon Survivor en móvil</h2>
+<p>El juego funciona en móviles y tablets en horizontal. Arrastra el dedo para moverte, toca los ataques para cambiarlos y pulsa el botón de pausa cuando lo necesites. También puedes jugar en Android o iPhone desde un navegador moderno.</p>
+<h2>Características principales</h2>
+<ul class="feat">
+<li><b>{N} Pokémon jugables</b> de las nueve regiones, con formas shiny cuando existen.</li>
+<li><b>Supervivencia estilo bullet heaven</b>: hordas, jefes, experiencia y mejoras.</li>
+<li><b>Movimientos que evolucionan</b>, objetos equipables, clima y tabla de tipos.</li>
+<li><b>Grietas legendarias</b> con arenas especiales y recompensas.</li>
+<li><b>Cooperativo online para hasta cuatro jugadores</b> con amigos.</li>
+</ul>
+<h2>¿Es como Pokémon Vampire Survivors?</h2>
+<p>PokéSurvivor pertenece al género de supervivencia con ataques automáticos, parecido a otros survivors-like, pero tiene sus propios mapas, reglas, Pokémon, movimientos y progresión.</p>
+<h2>Preguntas frecuentes</h2>
+<h3>¿PokéSurvivor es gratis?</h3><p>Sí. Es un proyecto de fans gratuito y sin ánimo de lucro. No necesitas descargar nada para empezar.</p>
+<h3>¿Cómo se juega en móvil?</h3><p>Abre el juego en el navegador del móvil, gira la pantalla en horizontal y arrastra el dedo para mover a tu compañero.</p>
+<h3>¿Puedo jugar en Android y iOS?</h3><p>Sí, siempre que uses un navegador moderno compatible con Canvas y audio web.</p>
+{cta(pid, lang, 'Empezar una partida')}
+</article>'''
+        ld = {'@context': 'https://schema.org', '@graph': [
+            {'@type': 'VideoGame', 'name': 'PokéSurvivor', 'url': SITE + PATH[lang][pid], 'inLanguage': 'es', 'isAccessibleForFree': True, 'gamePlatform': ['Web browser', 'Android', 'iOS'], 'playMode': ['SinglePlayer', 'CoOp']},
+            crumbs(pid, lang, h1)]}
+    elif lang == 'en':
+        h1 = 'Pokemon Survivor Play Free Online in Your Browser'
+        title = 'Pokemon Survivor Play Free Online in Your Browser | PokéSurvivor'
+        desc = 'Pokemon Survivor Play Free Online in Your Browser with PokéSurvivor: auto-attacks, roguelike upgrades, 966 Pokémon, mobile controls and co-op.'
+        body = f'''<article class="doc wide">
+<h1>{h1}</h1>
+<p class="lead">If you are looking for <b>Pokemon Survivor Play Free Online in Your Browser</b>, PokéSurvivor is a free <b>Pokémon survivor game</b> with no download. Pick a partner, dodge hordes, collect experience and choose upgrades as each run gets more intense.</p>
+<img src="../../assets/og-image.jpg" alt="Pixel art Pokémon survivor game scene in a browser" loading="lazy" width="1200" height="630">
+<p class="note"><time datetime="{TODAY}">Updated {TODAY}</time></p>
+{cta(pid, lang, 'Play free now')}
+<h2>Pokemon Survivor Play Free Online in Your Browser: how to play</h2>
+<p>Your Pokémon attacks automatically with the active move. You control movement, switch attacks and choose the best upgrade whenever you level up. Each run mixes action, exploration and roguelike decisions.</p>
+<h2>Pokemon survivor mobile, Android and iOS</h2>
+<p>For <b>pokemon survivor mobile</b> or <b>pokemon survivor android</b> play, use a phone or tablet in landscape mode. Drag anywhere to move, tap an attack to switch it and use the pause button when needed. The game also works on modern iOS browsers.</p>
+<h2>Pokémon survivor game features</h2>
+<ul class="feat">
+<li><b>{N} playable Pokémon</b> from all nine regions, with shiny forms where available.</li>
+<li><b>Bullet-heaven survival gameplay</b> with hordes, bosses, experience and upgrades.</li>
+<li><b>Evolving moves</b>, held items, weather effects and a type chart.</li>
+<li><b>Legendary rifts</b> with special arenas and rewards.</li>
+<li><b>Online co-op for up to four players</b> with your friends.</li>
+</ul>
+<h2>Pokemon vampire survivor gameplay</h2>
+<p>PokéSurvivor belongs to the auto-attack survival genre, similar to other survivors-like games, but it has its own maps, rules, Pokémon, moves and progression. It is a fan-made Pokémon survival game, not an official Pokémon title.</p>
+<h2>Frequently asked questions</h2>
+<h3>Is PokéSurvivor free to play?</h3><p>Yes. It is a free, non-profit fan project and you can start playing in your browser without a download.</p>
+<h3>Pokemon survivor how to play on mobile</h3><p>Open the game in your phone browser, rotate to landscape and drag your finger to move your partner. That is the basic <b>pokemon survivor how to play</b> control scheme.</p>
+<h3>Can I play on Android and iOS?</h3><p>Yes, on a modern browser that supports Canvas and web audio.</p>
+<h3>What does pokemon survivors mean here?</h3><p>PokéSurvivor is one Pokémon survivor game: you choose one partner, survive enemy waves and build a stronger run with upgrades.</p>
+{cta(pid, lang, 'Start a run')}
+</article>'''
+        ld = {'@context': 'https://schema.org', '@graph': [
+            {'@type': 'VideoGame', 'name': 'PokéSurvivor', 'url': SITE + PATH[lang][pid], 'inLanguage': 'en', 'isAccessibleForFree': True, 'gamePlatform': ['Web browser', 'Android', 'iOS'], 'playMode': ['SinglePlayer', 'CoOp']},
+            crumbs(pid, lang, h1)]}
+    else:
+        h1 = '寶可夢生存遊戲：在瀏覽器免費線上遊玩'
+        title = '寶可夢生存遊戲免費線上玩 | PokéSurvivor'
+        desc = '在瀏覽器免費遊玩 PokéSurvivor：寶可夢生存遊戲，包含自動攻擊、Roguelike 強化、手機操作、異色寶可夢與多人合作。'
+        body = f'''<article class="doc wide">
+<h1>{h1}</h1>
+<p class="lead">PokéSurvivor 是一款可以在瀏覽器免費遊玩的<b>寶可夢生存遊戲</b>，不需要下載。選擇夥伴、躲避一波波敵人、收集經驗，並在每次升級時選擇強化，挑戰更長的生存時間。</p>
+<img src="../../assets/og-image.jpg" alt="瀏覽器中的寶可夢生存遊戲像素畫面" loading="lazy" width="1200" height="630">
+<p class="note"><time datetime="{TODAY}">更新日期：{TODAY}</time></p>
+{cta(pid, lang, '免費開始遊玩')}
+<h2>遊戲玩法</h2>
+<p>你的寶可夢會自動使用目前招式攻擊。你需要控制移動、切換招式，並在升級時選擇合適的強化。每一局結合動作、生存與 Roguelike 選擇。</p>
+<h2>手機上遊玩 Pokémon Survivor</h2>
+<p>手機和平板請使用橫向畫面。拖曳手指即可移動，點擊招式可以切換攻擊，也可以使用暫停按鈕。Android 和 iPhone 都能透過現代瀏覽器遊玩。</p>
+<h2>主要特色</h2>
+<ul class="feat">
+<li><b>{N} 隻可遊玩的寶可夢</b>，來自九個地區，並包含可取得的異色形態。</li>
+<li><b>自動攻擊生存玩法</b>：敵人潮、首領、經驗值與多種強化。</li>
+<li><b>招式進化</b>、持有物品、天氣效果與屬性相剋。</li>
+<li><b>傳說裂隙</b>：進入特殊競技場並挑戰傳說寶可夢。</li>
+<li><b>最多四人的線上合作</b>，可以和好友一起遊玩。</li>
+</ul>
+<h2>常見問題</h2>
+<h3>PokéSurvivor 可以免費遊玩嗎？</h3><p>可以。這是一個免費且非營利的粉絲遊戲，不需要下載即可在瀏覽器開始遊玩。</p>
+<h3>手機要怎麼玩？</h3><p>用手機瀏覽器開啟遊戲，轉成橫向畫面，再拖曳手指移動你的夥伴。</p>
+<h3>Android 和 iOS 都能玩嗎？</h3><p>可以，請使用支援 Canvas 與 Web Audio 的現代瀏覽器。</p>
+{cta(pid, lang, '開始一局遊戲')}
+</article>'''
+        ld = {'@context': 'https://schema.org', '@graph': [
+            {'@type': 'VideoGame', 'name': 'PokéSurvivor', 'url': SITE + PATH[lang][pid], 'inLanguage': 'zh-Hant', 'isAccessibleForFree': True, 'gamePlatform': ['Web browser', 'Android', 'iOS'], 'playMode': ['SinglePlayer', 'CoOp']},
+            crumbs(pid, lang, h1)]}
+    write(pid, lang, page(pid, lang, title, desc, body, ld))
+
+def guide_zh_hant():
+    pid = 'guide'; me = PATH['zh-hant'][pid]
+    body = f'''<article class="doc">
+<h1>PokéSurvivor 遊戲指南：玩法與手機操作</h1>
+<p class="lead">PokéSurvivor 是一款免費的寶可夢生存遊戲。選擇夥伴，在無盡地圖中躲避敵人、收集經驗並強化招式。</p>
+{cta(pid, 'zh-hant', '免費開始遊玩')}
+<h2>如何遊玩</h2>
+<ul><li><b>電腦：</b>使用 W、A、S、D 或方向鍵移動，按 1–4、Q／E 切換招式，按 Esc 暫停。</li>
+<li><b>手機或平板：</b>使用橫向畫面，拖曳手指移動，點擊下方招式切換攻擊。</li>
+<li>寶可夢會自動攻擊，你的任務是走位、閃避並選擇適合的強化。</li>
+<li>收集經驗升級，從三張卡片中選擇新招式或能力提升。</li></ul>
+<h2>遊戲特色</h2>
+<ul class="feat"><li><b>{N} 隻寶可夢</b>，來自九個地區。</li><li>招式進化、持有物品、天氣與屬性相剋。</li><li>傳說裂隙與特殊競技場。</li><li>異色寶可夢、扭蛋、任務、成就與排行榜。</li><li>最多四人的線上合作遊玩。</li></ul>
+<h2>常見問題</h2>
+<h3>遊戲需要下載嗎？</h3><p>不需要。直接在瀏覽器開啟即可遊玩，也可以加入手機主畫面。</p>
+<h3>可以和朋友一起玩嗎？</h3><p>可以。登入雲端帳戶後，可以建立房間並邀請最多三位朋友。</p>
+<h3>這是官方寶可夢遊戲嗎？</h3><p>不是。這是一個免費、非營利的粉絲作品，與 Nintendo、GAME FREAK 和 The Pokémon Company 無關。</p>
+{cta(pid, 'zh-hant', '開始遊玩')}
+</article>'''
+    faq = [('遊戲需要下載嗎？', '不需要，直接在瀏覽器開啟即可遊玩。'), ('可以在手機遊玩嗎？', '可以，請使用橫向畫面並拖曳手指移動。'), ('可以和朋友合作嗎？', '可以，線上合作最多支援四名玩家。')]
+    ld = {'@context': 'https://schema.org', '@graph': [
+        {'@type': 'FAQPage', 'inLanguage': 'zh-Hant', 'mainEntity': [{'@type': 'Question', 'name': q, 'acceptedAnswer': {'@type': 'Answer', 'text': a}} for q, a in faq]},
+        crumbs(pid, 'zh-hant', '遊戲指南')]}
+    title = 'PokéSurvivor 遊戲指南：玩法、手機操作與生存技巧'
+    desc = 'PokéSurvivor 寶可夢生存遊戲指南：了解電腦與手機操作、升級、招式、傳說裂隙、異色寶可夢與多人合作。'
+    write(pid, 'zh-hant', page(pid, 'zh-hant', title, desc, body, ld))
 
 # ================= guía =================
 FAQ = {
@@ -546,7 +686,7 @@ you can make a <b>voluntary donation</b>. <b>All the money goes to the servers a
         title, desc = 'Support PokéSurvivor: donations for the servers', 'PokéSurvivor is free and ad-free. Voluntary donations only pay for the servers and the domain.'
     write(pid, lang, page(pid, lang, title, desc, body, {'@context': 'https://schema.org', '@graph': [crumbs(pid, lang, h1)]}))
 
-# ================= el juego en inglés (/en/) =================
+# ================= juegos localizados =================
 def game_en():
     # Parte de dev.html (con lo de SEO) y usa el mismo app.min.js que index.html,
     # así sale bien aunque index.html se haya generado con --sin-seo.
@@ -564,9 +704,9 @@ def game_en():
         ('<title>PokéSurvivor – Juego Pokémon gratis online estilo Survivor.io</title>', '<title>PokéSurvivor – Free online Pokémon survival game (Survivor.io style)</title>'),
         ('content="Sobrevive a hordas de Pokémon con tu compañero en este fan game gratis para navegador y móvil: 966 Pokémon, shinies, legendarios y cooperativo con amigos. Sin descargas ni anuncios."',
          f'content="Survive hordes of Pokémon with your partner in this free fan game for browser and mobile: {N} Pokémon, shinies, legendaries and online co-op with friends. No downloads, no ads."'),
-        ('<link rel="canonical" href="https://pokesurvivor.com/">', '<link rel="canonical" href="https://pokesurvivor.com/en/">'),
+        ('<link rel="canonical" href="https://pokesurvivor.xyz/">', '<link rel="canonical" href="https://pokesurvivor.xyz/en/">'),
         ('<meta property="og:locale" content="es_ES">', '<meta property="og:locale" content="en_US">'),
-        ('<meta property="og:url" content="https://pokesurvivor.com/">', '<meta property="og:url" content="https://pokesurvivor.com/en/">'),
+        ('<meta property="og:url" content="https://pokesurvivor.xyz/">', '<meta property="og:url" content="https://pokesurvivor.xyz/en/">'),
         ('<meta property="og:title" content="PokéSurvivor – Sobrevive a las hordas Pokémon">', '<meta property="og:title" content="PokéSurvivor – Survive the Pokémon hordes">'),
         ('<meta property="og:description" content="Fan game gratis para navegador y móvil: 966 Pokémon, shinies, legendarios y cooperativo hasta 4 amigos. Sin descargas ni anuncios.">',
          f'<meta property="og:description" content="A free fan game for browser and mobile: {N} Pokémon, shinies, legendaries and co-op with up to 4 friends. No downloads, no ads.">'),
@@ -580,6 +720,8 @@ def game_en():
         assert a in s, a[:60]
         s = s.replace(a, b)
     # Enlaces a las páginas: las de inglés.
+    s = s.replace('href="https://pokesurvivor.xyz/"', 'href="https://pokesurvivor.xyz/"', 1)
+    s = s.replace('hreflang="en" href="https://pokesurvivor.xyz/en/"', 'hreflang="en" href="https://pokesurvivor.xyz/en/"')
     s = s.replace('href="guia/"', 'href="en/guide/"').replace('href="pokedex/"', 'href="en/pokedex/"')
     s = s.replace('"description": "Fan game gratuito de supervivencia (bullet heaven, estilo Survivor.io) con Pokémon: elige compañero, sobrevive a hordas, sube de nivel, evoluciona tus ataques, enfréntate a legendarios en grietas y juega en cooperativo con hasta 4 amigos."',
                   '"description": "A free Pokémon survival fan game (bullet heaven, Survivor.io style): pick a partner, survive the hordes, level up, evolve your moves, fight legendaries in rifts and play co-op with up to 4 friends."')
@@ -587,10 +729,45 @@ def game_en():
     os.makedirs(os.path.join(ROOT, 'en'), exist_ok=True)
     open(os.path.join(ROOT, 'en', 'index.html'), 'w', encoding='utf-8').write(s)
 
+def game_zh_hant():
+    dev = open(os.path.join(ROOT, 'dev.html'), encoding='utf-8').read()
+    idx = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
+    app = re.search(r'<script defer src="js/app\.min\.js\?v=[^"]+"></script>', idx).group(0)
+    a, b = dev.index('<!-- scripts:begin -->'), dev.index('<!-- scripts:end -->') + len('<!-- scripts:end -->')
+    src = dev[:a] + app + dev[b:]
+    src = re.sub(r'<!-- seo:(begin|end) -->\n?', '', src)
+    src = re.sub(r'<meta name="robots" content="noindex">\s*', '', src)
+    src = re.sub(r'<!-- dev\.html: página fuente[^>]*-->\n?', '', src)
+    s = src.replace('<html lang="es">', '<html lang="zh-Hant">')
+    s = s.replace('<head>\n<meta charset="utf-8">', '<head>\n<meta charset="utf-8">\n<base href="../">', 1)
+    replacements = [
+        ('<title>PokéSurvivor – Juego Pokémon gratis online estilo Survivor.io</title>', '<title>PokéSurvivor – 免費寶可夢生存遊戲</title>'),
+        ('content="Sobrevive a hordas de Pokémon con tu compañero en este fan game gratis para navegador y móvil: 966 Pokémon, shinies, legendarios y cooperativo con amigos. Sin descargas ni anuncios."', f'content="在瀏覽器和手機上免費遊玩 PokéSurvivor：{N} 隻寶可夢、異色寶可夢、傳說裂隙與好友合作。不需要下載。"'),
+        ('<link rel="canonical" href="https://pokesurvivor.xyz/">', '<link rel="canonical" href="https://pokesurvivor.xyz/zh-hant/">'),
+        ('<meta property="og:locale" content="es_ES">', '<meta property="og:locale" content="zh_TW">'),
+        ('<meta property="og:url" content="https://pokesurvivor.xyz/">', '<meta property="og:url" content="https://pokesurvivor.xyz/zh-hant/">'),
+        ('<meta property="og:title" content="PokéSurvivor – Sobrevive a las hordas Pokémon">', '<meta property="og:title" content="PokéSurvivor – 免費寶可夢生存遊戲">'),
+        ('<meta property="og:description" content="Fan game gratis para navegador y móvil: 966 Pokémon, shinies, legendarios y cooperativo hasta 4 amigos. Sin descargas ni anuncios.">', f'<meta property="og:description" content="在瀏覽器和手機上免費遊玩：{N} 隻寶可夢、異色寶可夢、傳說裂隙與最多四人合作。不需要下載。">'),
+        ('<meta name="twitter:title" content="PokéSurvivor – Sobrevive a las hordas Pokémon">', '<meta name="twitter:title" content="PokéSurvivor – 免費寶可夢生存遊戲">'),
+        ('<meta name="twitter:description" content="Fan game gratis para navegador y móvil, con cooperativo hasta 4. Sin descargas ni anuncios.">', '<meta name="twitter:description" content="在瀏覽器和手機上免費遊玩，支援最多四人合作。">'),
+        ('<p>Juego de supervivencia con Pokémon, gratis en el navegador y en el móvil.</p>', '<p>在瀏覽器和手機上免費遊玩的寶可夢生存遊戲。</p>'),
+        ('<p class="boot-ld">Cargando…</p>', '<p class="boot-ld">載入中…</p>'),
+    ]
+    for old, new in replacements:
+        assert old in s, old[:60]
+        s = s.replace(old, new)
+    s = s.replace('href="guia/"', 'href="zh-hant/guide/"').replace('href="pokedex/"', 'href="en/pokedex/"')
+    s = s.replace('"inLanguage": "es"', '"inLanguage": "zh-Hant"')
+    # The source page has the three locale alternates; keep them pointing to
+    # their own canonical locations on the translated game shell.
+    s = s.replace('hreflang="es" href="https://pokesurvivor.xyz/"', 'hreflang="es" href="https://pokesurvivor.xyz/"')
+    os.makedirs(os.path.join(ROOT, 'zh-hant'), exist_ok=True)
+    open(os.path.join(ROOT, 'zh-hant', 'index.html'), 'w', encoding='utf-8').write(s)
+
 # ================= 404, robots y sitemap =================
 def extra():
     nf = '''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex"><title>404 · PokéSurvivor</title><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="48x48" href="/assets/icons/icon-48.png"><link rel="stylesheet" href="/css/pages.css"></head>
+<meta name="robots" content="noindex"><title>404 · PokéSurvivor</title><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="48x48" href="/assets/icons/icon-48.png"><link rel="stylesheet" href="/css/pages.css?v=20261012"></head>
 <body><header class="top"><a class="brand" href="/">PokéSurvivor</a><nav><a href="/guia/">Guía</a><a href="/en/">English</a><a class="play" href="/">Jugar gratis</a></nav></header>
 <main><article class="doc center"><h1>404 · Te has perdido en la mazmorra</h1><p class="lead">Esta página no existe. Pero las hordas siguen esperando…</p>
 <p class="lead" lang="en">This page doesn't exist. But the hordes are still waiting…</p>
@@ -598,11 +775,11 @@ def extra():
 '''
     open(os.path.join(ROOT, '404.html'), 'w', encoding='utf-8').write(nf)
     open(os.path.join(ROOT, 'robots.txt'), 'w', encoding='utf-8').write(f'# PokéSurvivor\nUser-agent: *\nAllow: /\nDisallow: /tools/\nDisallow: /docs/\nDisallow: /dev.html\n\nSitemap: {SITE}sitemap.xml\n')
-    PRI = {'home': '1.0', 'guide': '0.8', 'pokedex': '0.7', 'legends': '0.7', 'moves': '0.6', 'types': '0.6', 'shinies': '0.6', 'achievements': '0.5', 'items': '0.5', 'news': '0.5', 'support': '0.4'}
+    PRI = {'home': '1.0', 'play': '0.9', 'guide': '0.8', 'pokedex': '0.7', 'legends': '0.7', 'moves': '0.6', 'types': '0.6', 'shinies': '0.6', 'achievements': '0.5', 'items': '0.5', 'news': '0.5', 'support': '0.4'}
     urls = []
     for pid in PAGES:
-        for lang in ('es', 'en'):
-            alts = ''.join(f'<xhtml:link rel="alternate" hreflang="{l}" href="{SITE}{PATH[l][pid]}"/>' for l in ('es', 'en'))
+        for lang in langs_for(pid):
+            alts = ''.join(f'<xhtml:link rel="alternate" hreflang="{LOCALE[l]}" href="{SITE}{PATH[l][pid]}"/>' for l in langs_for(pid))
             alts += f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE}{PATH["es"][pid]}"/>'
             urls.append(f'  <url><loc>{SITE}{PATH[lang][pid]}</loc><lastmod>{TODAY}</lastmod><priority>{PRI[pid]}</priority>{alts}</url>\n')
     open(os.path.join(ROOT, 'sitemap.xml'), 'w', encoding='utf-8').write(
@@ -610,5 +787,6 @@ def extra():
 
 for lang in ('es', 'en'):
     guide(lang); pokedex(lang); legends(lang); shinies(lang); types_page(lang); moves_page(lang); items_page(lang); ach_page(lang); news(lang); support(lang)
-game_en(); extra()
-print('ok:', 2 * (len(PAGES) - 1), 'páginas + en/ (juego en inglés), 404, robots, sitemap')
+play_page('es'); play_page('en'); play_page('zh-hant'); guide_zh_hant()
+game_en(); game_zh_hant(); extra()
+print('ok: localized SEO pages, game shells, 404, robots and sitemap')

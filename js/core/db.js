@@ -338,7 +338,7 @@ G.DB = (() => {
       if (rtdb) rtdb.useEmulator('127.0.0.1', 9000);
     }
     await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-    auth.languageCode = 'es';
+    auth.languageCode = G.I18n.lang === 'en' ? 'en' : (G.I18n.lang === 'zh-hant' ? 'zh-TW' : 'es');
     addEventListener('online', () => { if (pending) pushNow(); });
     // Al salir de la pestaña o cerrarla se sube lo pendiente, pero no más de una
     // vez cada 10 min: la gente cambia de pestaña a menudo y cada partida se

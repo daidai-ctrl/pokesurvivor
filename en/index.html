@@ -6,7 +6,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PokéSurvivor – Free online Pokémon survival game (Survivor.io style)</title>
 <meta name="description" content="Survive hordes of Pokémon with your partner in this free fan game for browser and mobile: 966 Pokémon, shinies, legendaries and online co-op with friends. No downloads, no ads.">
-<link rel="canonical" href="https://pokesurvivor.com/en/">
+<link rel="canonical" href="https://pokesurvivor.xyz/en/">
+<link rel="alternate" hreflang="es" href="https://pokesurvivor.xyz/">
+<link rel="alternate" hreflang="en" href="https://pokesurvivor.xyz/en/">
+<link rel="alternate" hreflang="zh-Hant" href="https://pokesurvivor.xyz/zh-hant/">
+<link rel="alternate" hreflang="x-default" href="https://pokesurvivor.xyz/">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#0a1430">
 <meta name="color-scheme" content="dark">
@@ -14,17 +18,17 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PokéSurvivor">
 <meta property="og:locale" content="en_US">
-<meta property="og:url" content="https://pokesurvivor.com/en/">
+<meta property="og:url" content="https://pokesurvivor.xyz/en/">
 <meta property="og:title" content="PokéSurvivor – Survive the Pokémon hordes">
 <meta property="og:description" content="A free fan game for browser and mobile: 966 Pokémon, shinies, legendaries and co-op with up to 4 friends. No downloads, no ads.">
-<meta property="og:image" content="https://pokesurvivor.com/assets/og-image.jpg">
+<meta property="og:image" content="https://pokesurvivor.xyz/assets/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="PokéSurvivor: un Pokémon rodeado de hordas en un mapa pixel art">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PokéSurvivor – Survive the Pokémon hordes">
 <meta name="twitter:description" content="A free fan game for browser and mobile, with co-op for up to 4. No downloads, no ads.">
-<meta name="twitter:image" content="https://pokesurvivor.com/assets/og-image.jpg">
+<meta name="twitter:image" content="https://pokesurvivor.xyz/assets/og-image.jpg">
 <script>window.PS_PAGES = true;</script>
 <link rel="manifest" href="manifest.webmanifest">
 <!-- Google sólo enseña en los resultados iconos de 48 px o múltiplos -->
@@ -47,18 +51,18 @@
   "@graph": [
     {
       "@type": "WebSite",
-      "@id": "https://pokesurvivor.com/#web",
-      "url": "https://pokesurvivor.com/",
+      "@id": "https://pokesurvivor.xyz/#web",
+      "url": "https://pokesurvivor.xyz/",
       "name": "PokéSurvivor",
       "inLanguage": ["es", "en"]
     },
     {
       "@type": ["VideoGame", "WebApplication"],
-      "@id": "https://pokesurvivor.com/#juego",
+      "@id": "https://pokesurvivor.xyz/#juego",
       "name": "PokéSurvivor",
-      "url": "https://pokesurvivor.com/",
+      "url": "https://pokesurvivor.xyz/",
       "description": "A free Pokémon survival fan game (bullet heaven, Survivor.io style): pick a partner, survive the hordes, level up, evolve your moves, fight legendaries in rifts and play co-op with up to 4 friends.",
-      "image": "https://pokesurvivor.com/assets/og-image.jpg",
+      "image": "https://pokesurvivor.xyz/assets/og-image.jpg",
       "inLanguage": ["es", "en"],
       "genre": ["Roguelike", "Bullet heaven", "Acción", "Supervivencia"],
       "gamePlatform": ["Navegador web", "PC", "Android", "iOS"],
@@ -68,7 +72,7 @@
       "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 4 },
       "isAccessibleForFree": true,
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR", "availability": "https://schema.org/InStock" },
-      "isPartOf": { "@id": "https://pokesurvivor.com/#web" }
+      "isPartOf": { "@id": "https://pokesurvivor.xyz/#web" }
     }
   ]
 }
@@ -283,13 +287,13 @@
 <script>
   (function () {
     var s = null; try { s = localStorage.getItem('ps.lang'); } catch (e) {}
-    var n = ((navigator.languages && navigator.languages[0]) || navigator.language || 'es').toLowerCase();
-    var l = s === 'es' || s === 'en' ? s : (/\/en(\/|$)/.test(location.pathname) ? 'en' : (n.indexOf('es') === 0 ? 'es' : 'en'));
+    var pathLang = /\/en(\/|$)/.test(location.pathname) ? 'en' : (/\/zh-hant(\/|$)/.test(location.pathname) ? 'zh-hant' : null);
+    var l = pathLang || (s === 'es' || s === 'en' || s === 'zh-hant' ? s : 'es');
     document.documentElement.lang = l;
-    if (l === 'en') {
+    if (l === 'en' || l === 'zh-hant') {
       var p = document.querySelectorAll('#boot p');
-      p[0].textContent = 'A Pokémon survival game, free in your browser and on mobile.';
-      p[1].textContent = 'Loading…';
+      p[0].textContent = l === 'en' ? 'A Pokémon survival game, free in your browser and on mobile.' : '在瀏覽器和手機上免費遊玩的寶可夢生存遊戲。';
+      p[1].textContent = l === 'en' ? 'Loading…' : '載入中…';
     }
   })();
 </script>
@@ -521,6 +525,6 @@
 </section>
 
 <!-- datos generados -->
-<script defer src="js/app.min.js?v=2b6eca7afe"></script>
+<script defer src="js/app.min.js?v=d071f30bac"></script>
 </body>
 </html>

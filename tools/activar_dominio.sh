@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Paso final del dominio pokesurvivor.com (ver docs/DOMINIO.md).
+# Paso final del dominio pokesurvivor.xyz (ver docs/DOMINIO.md).
 #   DRY=1 bash tools/activar_dominio.sh   ensayo: prepara todo, enseña qué se subiría y lo deja como estaba
 #   bash tools/activar_dominio.sh         prepara y hace el commit (el push y GitHub Pages, aparte)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-DOMAIN=pokesurvivor.com
+DOMAIN=pokesurvivor.xyz
 
 # 1. El juego con los bloques SEO, los datos y las páginas en los dos idiomas.
 node tools/build.js

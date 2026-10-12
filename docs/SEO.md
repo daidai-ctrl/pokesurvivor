@@ -1,4 +1,4 @@
-# SEO y dominio pokesurvivor.com
+# SEO y dominio pokesurvivor.xyz
 
 Todo lo técnico ya está preparado en el código. Falta lo que sólo puedes hacer tú
 (comprar el dominio, configurar el DNS y dar de alta la web en Google).
@@ -19,23 +19,23 @@ Todo lo técnico ya está preparado en el código. Falta lo que sólo puedes hac
 Las páginas se regeneran con `python tools/make_seo_pages.py` (por ejemplo, si
 cambian los Pokémon o las características).
 
-> **Importante:** las direcciones canónicas ya apuntan a `https://pokesurvivor.com/`.
+> **Importante:** las direcciones canónicas ya apuntan a `https://pokesurvivor.xyz/`.
 > No publiques estos cambios hasta que el dominio funcione, o Google intentará
 > indexar un dominio que todavía no existe.
 
 ## 1. Dominio
 
-Los pasos para poner en marcha pokesurvivor.com (DNS en Cloudflare, GitHub Pages,
+Los pasos para poner en marcha pokesurvivor.xyz (DNS en Cloudflare, GitHub Pages,
 Firebase y el paso final) están en [DOMINIO.md](DOMINIO.md).
 
 ## 2. Google Search Console (lo más importante)
 
 1. Entra en <https://search.google.com/search-console> con tu cuenta de Google.
-2. **Añadir propiedad → Dominio** → `pokesurvivor.com`.
+2. **Añadir propiedad → Dominio** → `pokesurvivor.xyz`.
 3. Google te da un registro **TXT**: añádelo en el DNS (nombre `@`) y pulsa Verificar
    (puede tardar unos minutos).
 4. **Sitemaps** → enviar `sitemap.xml`.
-5. **Inspección de URL** → `https://pokesurvivor.com/` → **Solicitar indexación**.
+5. **Inspección de URL** → `https://pokesurvivor.xyz/` → **Solicitar indexación**.
    Repite con `/guia/` y `/pokedex/`.
 
 Bing (y con él DuckDuckGo y Ecosia): <https://www.bing.com/webmasters> → "Importar

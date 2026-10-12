@@ -3,7 +3,7 @@
  * número...). Ver js/core/i18n.js. Los nombres de movimientos, objetos y tipos
  * son los oficiales en inglés.
  */
-G.I18n.add({
+if (G.I18n.lang === 'en') G.I18n.add({
   // ---------------- tipos y regiones ----------------
   'Acero': 'Steel', 'Agua': 'Water', 'Bicho': 'Bug', 'Dragón': 'Dragon', 'Eléctrico': 'Electric', 'Fantasma': 'Ghost',
   'Fuego': 'Fire', 'Hada': 'Fairy', 'Hielo': 'Ice', 'Lucha': 'Fighting', 'Planta': 'Grass', 'Psíquico': 'Psychic',
@@ -451,7 +451,7 @@ G.I18n.add({
   'donación voluntaria': 'voluntary donation', ': todo el dinero se usa para los': ': all the money goes to the', 'servidores y el dominio': 'servers and the domain', ', nada más.': ', nothing else.',
   'Donar no da ninguna ventaja en el juego.': 'Donating gives no advantage in the game.', 'Lo que cuesta mantenerlo': 'What it costs to keep it running',
   'Servidores (partidas, cuentas, ranking y multijugador)': 'Servers (saves, accounts, leaderboards and multiplayer)',
-  'Según cuánta gente juegue': 'Depends on how many people play', 'Dominio pokesurvivor.com': 'Domain pokesurvivor.com', '≈12 € al año': '≈€12 per year',
+  'Según cuánta gente juegue': 'Depends on how many people play', 'Dominio pokesurvivor.xyz': 'Domain pokesurvivor.xyz', '≈12 € al año': '≈€12 per year',
   'Cuanta más gente juega, más cuestan los servidores. Lo que sobre se guarda para los gastos de los meses siguientes.': 'The more people play, the more the servers cost. Anything left over is saved for the following months\' costs.',
   'Juego de fans {x}: sin anuncios ni compras. Pokémon y sus personajes son propiedad de Nintendo, Creatures y GAME FREAK; este proyecto no está afiliado a ellos.': 'Fan game {x}: no ads or purchases. Pokémon and its characters are owned by Nintendo, Creatures and GAME FREAK; this project is not affiliated with them.',
   ': sin anuncios ni compras. Pokémon y sus personajes son propiedad de Nintendo, Creatures y GAME FREAK; este proyecto no está afiliado a ellos.': ': no ads or purchases. Pokémon and its characters are owned by Nintendo, Creatures and GAME FREAK; this project is not affiliated with them.',

@@ -13,7 +13,7 @@
  * Variables del Worker (Settings -> Variables and Secrets, tipo "Secret"):
  *   TURN_KEY_ID         el "Turn Token ID" de Cloudflare Realtime -> TURN
  *   TURN_KEY_API_TOKEN  el "API Token" de esa misma clave
- * Dominio: turn.pokesurvivor.com (Settings -> Domains & Routes -> Custom domain).
+ * Dominio: turn.pokesurvivor.xyz (Settings -> Domains & Routes -> Custom domain).
  * Ver docs/TURN.md.
  *
  * /online — contador aproximado de gente jugando (sin coste: plan gratis de
@@ -35,7 +35,7 @@
  * función), así nadie más puede tocar el contador.
  */
 const PROJECT = 'pokesurvivor-jpter';
-const ORIGINS = ['https://pokesurvivor.com', 'https://www.pokesurvivor.com', 'http://127.0.0.1:8765', 'http://localhost:8765'];
+const ORIGINS = ['https://pokesurvivor.xyz', 'https://www.pokesurvivor.xyz', 'http://127.0.0.1:8765', 'http://localhost:8765'];
 const TTL = 4 * 3600;                         // segundos que valen las credenciales
 const JWKS = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 

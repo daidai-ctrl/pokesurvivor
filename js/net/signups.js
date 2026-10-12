@@ -21,7 +21,7 @@
  * LIMIT en cloudflare/turn-worker.js y volver a activar el portero.
  */
 G.Signups = (() => {
-  const URL = 'https://turn.pokesurvivor.com/mau';
+  const URL = 'https://turn.pokesurvivor.xyz/mau';
   const CACHE = 30 * 60 * 1000, K_OPEN = 'ps.mau.open';
   let open = true, checkedAt = 0;
   try {

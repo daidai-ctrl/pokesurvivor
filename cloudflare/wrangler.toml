@@ -7,7 +7,7 @@ workers_dev = true
 preview_urls = false
 keep_vars = true            # no borra las variables/secretos puestos en el panel
 
-routes = [ { pattern = "turn.pokesurvivor.com", custom_domain = true } ]
+routes = [ { pattern = "turn.pokesurvivor.xyz", custom_domain = true } ]
 
 [[durable_objects.bindings]]
 name = "ONLINE"

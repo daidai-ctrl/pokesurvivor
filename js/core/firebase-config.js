@@ -8,15 +8,9 @@
  *
  * Si se pone a null, el juego funciona en modo local (sólo en el navegador).
  */
-G.FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyD4YpfZCVUmJJbWPLPmYo6Lyxhsg0wMAKc',
-  authDomain: 'pokesurvivor-jpter.firebaseapp.com',
-  projectId: 'pokesurvivor-jpter',
-  storageBucket: 'pokesurvivor-jpter.firebasestorage.app',
-  messagingSenderId: '955377776652',
-  appId: '1:955377776652:web:213d0107d3c36aa0fe5629',
-  databaseURL: 'https://pokesurvivor-jpter-default-rtdb.europe-west1.firebasedatabase.app'
-};
+// Deliberately disabled in the public starter. Add your own Firebase project
+// before enabling accounts, cloud saves, rankings or multiplayer.
+G.FIREBASE_CONFIG = null;
 
 /* Ejemplo de cómo debe quedar:
 G.FIREBASE_CONFIG = {

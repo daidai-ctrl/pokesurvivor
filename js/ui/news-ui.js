@@ -20,7 +20,8 @@ G.NewsUI = (() => {
 
   function fmt(d) {
     const [y, m, day] = d.split('-').map(Number);
-    return new Date(y, m - 1, day).toLocaleDateString(G.I18n.lang === 'en' ? 'en-GB' : 'es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    const locale = G.I18n.lang === 'en' ? 'en-GB' : (G.I18n.lang === 'zh-hant' ? 'zh-TW' : 'es-ES');
+    return new Date(y, m - 1, day).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   function open() {
