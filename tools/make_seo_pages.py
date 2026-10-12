@@ -776,12 +776,25 @@ def extra():
     open(os.path.join(ROOT, '404.html'), 'w', encoding='utf-8').write(nf)
     open(os.path.join(ROOT, 'robots.txt'), 'w', encoding='utf-8').write(f'# PokéSurvivor\nUser-agent: *\nAllow: /\nDisallow: /tools/\nDisallow: /docs/\nDisallow: /dev.html\n\nSitemap: {SITE}sitemap.xml\n')
     PRI = {'home': '1.0', 'play': '0.9', 'guide': '0.8', 'pokedex': '0.7', 'legends': '0.7', 'moves': '0.6', 'types': '0.6', 'shinies': '0.6', 'achievements': '0.5', 'items': '0.5', 'news': '0.5', 'support': '0.4'}
+    FREQ = {'home': 'weekly', 'play': 'weekly', 'guide': 'weekly', 'pokedex': 'weekly', 'legends': 'weekly', 'moves': 'monthly', 'types': 'monthly', 'shinies': 'monthly', 'achievements': 'monthly', 'items': 'monthly', 'news': 'weekly', 'support': 'monthly'}
     urls = []
     for pid in PAGES:
         for lang in langs_for(pid):
-            alts = ''.join(f'<xhtml:link rel="alternate" hreflang="{LOCALE[l]}" href="{SITE}{PATH[l][pid]}"/>' for l in langs_for(pid))
-            alts += f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE}{PATH["es"][pid]}"/>'
-            urls.append(f'  <url><loc>{SITE}{PATH[lang][pid]}</loc><lastmod>{TODAY}</lastmod><priority>{PRI[pid]}</priority>{alts}</url>\n')
+            alts = '\n'.join(
+                f'    <xhtml:link rel="alternate" hreflang="{LOCALE[l]}" href="{SITE}{PATH[l][pid]}" />'
+                for l in langs_for(pid)
+            )
+            alts += f'\n    <xhtml:link rel="alternate" hreflang="x-default" href="{SITE}{PATH["es"][pid]}" />'
+            urls.append(
+                f'''  <url>
+    <loc>{SITE}{PATH[lang][pid]}</loc>
+    <lastmod>{TODAY}T00:00:00.000Z</lastmod>
+    <changefreq>{FREQ[pid]}</changefreq>
+    <priority>{PRI[pid]}</priority>
+{alts}
+  </url>
+'''
+            )
     open(os.path.join(ROOT, 'sitemap.xml'), 'w', encoding='utf-8').write(
         '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' + ''.join(urls) + '</urlset>\n')
 
