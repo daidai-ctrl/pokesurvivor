@@ -19,7 +19,7 @@ Cloudflare Pages 托管，避免把域名再指向原作者或 GitHub Pages。
 
 - Framework preset：`None`
 - Build command：留空
-- Build output directory：`/`（仓库根目录）
+- Build output directory：`.`（仓库根目录）
 - Production branch：`main`
 
 部署完成后，在 Pages 项目的 Custom domains 中添加 `pokesurvivor.xyz` 和
