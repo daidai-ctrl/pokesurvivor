@@ -100,12 +100,12 @@ def page(pid, lang, title, desc, body, ld=None):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-H5KJTWNT655"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H5KJTWN655"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){{dataLayer.push(arguments);}}
   gtag('js', new Date());
-  gtag('config', 'G-H5KJTWNT655');
+  gtag('config', 'G-H5KJTWN655');
 </script>
 <title>{esc(title)}</title>
 <meta name="description" content="{esc(desc)}">
@@ -776,8 +776,8 @@ def game_zh_hant():
 def extra():
     nf = '''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-H5KJTWNT655"></script><script>
-window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H5KJTWNT655');
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H5KJTWN655"></script><script>
+window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H5KJTWN655');
 </script>
 <meta name="robots" content="noindex"><title>404 · PokéSurvivor</title><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="48x48" href="/assets/icons/icon-48.png"><link rel="stylesheet" href="/css/pages.css?v=20261012"></head>
 <body><header class="top"><a class="brand" href="/">PokéSurvivor</a><nav><a href="/guia/">Guía</a><a href="/en/">English</a><a class="play" href="/">Jugar gratis</a></nav></header>
