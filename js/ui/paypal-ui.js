@@ -1,6 +1,6 @@
-/* ============ paypal-ui.js — independent PayPal Sandbox checkout ============
- * The Waffo link remains untouched. This module only appears when the
- * separate PayPal Worker explicitly reports that its Sandbox config is ready.
+/* ============ paypal-ui.js — independent PayPal checkout ============
+ * The Waffo link remains independent. This module appears only when the
+ * separate PayPal Worker explicitly reports a valid Sandbox or Live config.
  */
 G.PayPalUI = (() => {
   const $ = id => document.getElementById(id);
@@ -81,7 +81,7 @@ G.PayPalUI = (() => {
           await G.DB.flush();
           if (!G.DB.online || G.DB.syncState !== 'ok') throw new Error('请先登录并完成存档同步');
         }
-        status('正在创建测试订单…');
+        status('正在创建 PayPal 订单…');
         const requestId = 'ps-' + crypto.randomUUID();
         const result = await request('/v1/orders', { method: 'POST', headers: { 'Idempotency-Key': requestId }, body: JSON.stringify({ product: 'tickets10' }) });
         return result.orderId;
@@ -91,12 +91,12 @@ G.PayPalUI = (() => {
           status('付款完成，正在确认并发放票券…');
           const result = await request('/v1/orders/' + encodeURIComponent(data.orderID) + '/capture', { method: 'POST', body: '{}' });
           await syncAndClaim(result.grantId);
-          status('测试付款成功，已到账 10 张票券。');
+          status('PayPal 支付成功，已到账 10 张票券。');
           if (G.GachaUI && G.GachaUI.refresh) G.GachaUI.refresh();
         } catch (e) { status(e.message || '付款已完成，但票券正在等待同步，请稍后重试。', true); }
       },
-      onCancel: () => status('已取消测试付款。'),
-      onError: e => { console.error('[PayPal]', e); status('PayPal 测试付款失败，请稍后再试。', true); }
+      onCancel: () => status('已取消 PayPal 付款。'),
+      onError: e => { console.error('[PayPal]', e); status('PayPal 付款失败，请稍后再试。', true); }
     }).render('#paypal-buttons');
   }
 
@@ -105,13 +105,13 @@ G.PayPalUI = (() => {
     if (!card) return;
     try {
       config = await publicConfig();
-      if (!config || !config.enabled || config.environment !== 'sandbox') return;
+      if (!config || !config.enabled || !['sandbox', 'live'].includes(config.environment)) return;
       card.hidden = false;
-      status('Sandbox 测试环境');
+      status(config.environment === 'live' ? 'PayPal 正式支付' : 'Sandbox 测试环境');
       await mount();
       setTimeout(claimPending, 2500);
     } catch (e) {
-      console.info('[PayPal] Sandbox button hidden:', e.message);
+      console.info('[PayPal] button hidden:', e.message);
     }
   }
 
