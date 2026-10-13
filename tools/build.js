@@ -27,8 +27,10 @@ fs.mkdirSync(path.dirname(tmp), { recursive: true });
 fs.writeFileSync(tmp, joined);
 const outJs = path.join(ROOT, 'js', 'app.min.js');
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-execFileSync(npx, ['--yes', 'terser@5', tmp, '--compress', 'passes=1', '--mangle', '--comments', 'false', '--ecma', '2020', '-o', outJs],
-  { stdio: 'inherit', shell: process.platform === 'win32' });
+// Use paths relative to ROOT so Windows shells do not split a workspace path
+// such as "D:\\Codex\\poke survivor" at its space.
+execFileSync(npx, ['--yes', 'terser@5', path.relative(ROOT, tmp), '--compress', 'passes=1', '--mangle', '--comments', 'false', '--ecma', '2020', '-o', path.relative(ROOT, outJs)],
+  { stdio: 'inherit', cwd: ROOT, shell: process.platform === 'win32' });
 const min = fs.readFileSync(outJs);
 const hash = crypto.createHash('sha1').update(min).digest('hex').slice(0, 10);
 
