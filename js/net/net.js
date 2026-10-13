@@ -26,12 +26,16 @@ G.Net = (() => {
   const DIRECT_TIMEOUT = 9000;     // ms para conseguir canal directo antes de usar el relé
 
   // ---------------- TURN (Cloudflare) ----------------
-  const TURN_URL = 'https://turn.pokesurvivor.xyz/';
+  // TURN is deliberately disabled until PokéSurvivor's own Cloudflare
+  // Worker is deployed. This prevents the new Firebase project from sending
+  // tokens to the original project's TURN endpoint; Realtime Database remains
+  // the multiplayer relay fallback for now.
+  const TURN_URL = '';
   let turn = null, turnAt = 0, turnReq = null;
   /** Pide (o reutiliza) credenciales TURN. Nunca falla: sin ellas, se sigue como antes. */
   function fetchTurn() {
     const fb = G.DB.fb;
-    if (!fb || fb.emulator || !fb.auth || !fb.auth.currentUser) return Promise.resolve(null);
+    if (!TURN_URL || !fb || fb.emulator || !fb.auth || !fb.auth.currentUser) return Promise.resolve(null);
     if (turn && Date.now() - turnAt < (turn.ttl - 600) * 1000) return Promise.resolve(turn);
     if (turnReq) return turnReq;
     turnReq = fb.auth.currentUser.getIdToken()

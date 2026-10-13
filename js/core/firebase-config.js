@@ -8,9 +8,17 @@
  *
  * Si se pone a null, el juego funciona en modo local (sólo en el navegador).
  */
-// Deliberately disabled in the public starter. Add your own Firebase project
-// before enabling accounts, cloud saves, rankings or multiplayer.
-G.FIREBASE_CONFIG = null;
+// PokéSurvivor's own Firebase project. These Web SDK values are public by
+// design; Firestore and Realtime Database rules protect the actual data.
+G.FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyDG5_k-DmKo4XC__He1ClB8BKp93wZx8q0',
+  authDomain: 'pokesurvivor-xyz.firebaseapp.com',
+  projectId: 'pokesurvivor-xyz',
+  storageBucket: 'pokesurvivor-xyz.firebasestorage.app',
+  messagingSenderId: '559114200524',
+  appId: '1:559114200524:web:0360256ec6b4dc384be969',
+  databaseURL: 'https://pokesurvivor-xyz-default-rtdb.europe-west1.firebasedatabase.app'
+};
 
 /* Ejemplo de cómo debe quedar:
 G.FIREBASE_CONFIG = {
