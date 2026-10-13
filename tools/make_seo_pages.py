@@ -48,7 +48,7 @@ LEG = set(D['legends'])
 # ---------------- rutas ----------------
 PAGES = ['home', 'play', 'guide', 'pokedex', 'legends', 'shinies', 'types', 'moves', 'items', 'achievements', 'news', 'support']
 PATH = {
-    'es': {'home': '', 'play': 'juego-supervivencia-pokemon-gratis-online/', 'guide': 'guia/', 'pokedex': 'pokedex/', 'legends': 'legendarios/', 'shinies': 'shinies/', 'types': 'tipos/',
+    'es': {'home': '', 'play': 'pokemon-survivor-movil/', 'guide': 'guia/', 'pokedex': 'pokedex/', 'legends': 'legendarios/', 'shinies': 'shinies/', 'types': 'tipos/',
            'moves': 'movimientos/', 'items': 'objetos/', 'achievements': 'logros/', 'news': 'novedades/', 'support': 'apoyar/'},
     'en': {'home': 'en/', 'play': 'en/pokemon-survivor-play-free-online-in-your-browser/', 'guide': 'en/guide/', 'pokedex': 'en/pokedex/', 'legends': 'en/legendaries/', 'shinies': 'en/shinies/', 'types': 'en/types/',
            'moves': 'en/moves/', 'items': 'en/items/', 'achievements': 'en/achievements/', 'news': 'en/news/', 'support': 'en/support/'},
@@ -170,19 +170,19 @@ def cta(pid, lang, text):
 def play_page(lang):
     pid = 'play'
     if lang == 'es':
-        h1 = 'Juego de supervivencia Pokémon gratis online en tu navegador'
-        title = 'Juego de supervivencia Pokémon gratis online | PokéSurvivor'
-        desc = 'Juego de supervivencia Pokémon gratis online en tu navegador: ataques automáticos, mejoras roguelike, móvil y cooperativo con PokéSurvivor.'
+        h1 = 'Pokémon Survivor en móvil: jugar gratis en Android e iPhone'
+        title = 'Pokémon Survivor en móvil: Android e iPhone gratis | PokéSurvivor'
+        desc = 'Juega a Pokémon Survivor en móvil con Android o iPhone: controles táctiles, modo horizontal, cooperativo, evoluciones y 966 Pokémon. Gratis en el navegador.'
         body = f'''<article class="doc wide">
 <h1>{h1}</h1>
-<p class="lead">PokéSurvivor es un <b>juego de supervivencia con Pokémon</b> que puedes jugar gratis online en tu navegador, sin descargas. Elige un compañero, esquiva hordas, consigue experiencia y mejora tus movimientos mientras intentas sobrevivir cada vez más.</p>
+<p class="lead">Si buscas Pokémon Survivor en móvil, PokéSurvivor es un <b>juego de supervivencia con Pokémon para móvil</b> que puedes jugar gratis en Android e iPhone desde el navegador, sin descargas. Usa controles táctiles, elige un compañero y sobrevive a hordas cada vez más intensas.</p>
 <img src="../assets/og-image.jpg" alt="Escena pixel art de un juego de supervivencia Pokémon" loading="lazy" width="1200" height="630">
 <p class="note"><time datetime="{TODAY}">Actualizado: {TODAY}</time></p>
 {cta(pid, lang, 'Jugar ahora gratis')}
-<h2>Juego de supervivencia Pokémon gratis online: cómo se juega</h2>
-<p>Tu Pokémon ataca automáticamente con el movimiento activo. Tú decides dónde moverte, cuándo cambiar de ataque y qué mejoras elegir al subir de nivel. Las partidas combinan acción, exploración y decisiones roguelike.</p>
-<h2>Pokémon Survivor en móvil</h2>
-<p>El juego funciona en móviles y tablets en horizontal. Arrastra el dedo para moverte, toca los ataques para cambiarlos y pulsa el botón de pausa cuando lo necesites. También puedes jugar en Android o iPhone desde un navegador moderno.</p>
+<h2>Cómo jugar a Pokémon Survivor en móvil</h2>
+<p>Tu Pokémon ataca automáticamente con el movimiento activo. En la pantalla táctil, arrastra el dedo para moverte, evita las zonas de peligro y elige la mejor mejora al subir de nivel. Las partidas combinan acción y decisiones roguelike.</p>
+<h2>Controles táctiles en Android e iPhone</h2>
+<p>Coloca el teléfono o la tablet en horizontal para ver mejor las hordas. Arrastra desde cualquier zona libre para mover a tu compañero, toca un ataque para cambiarlo y usa el botón de pausa cuando lo necesites. El juego funciona en navegadores modernos de Android e iOS.</p>
 <h2>Características principales</h2>
 <ul class="feat">
 <li><b>{N} Pokémon jugables</b> de las nueve regiones, con formas shiny cuando existen.</li>
@@ -707,7 +707,7 @@ def game_en():
     src = re.sub(r'<meta name="robots" content="noindex">\s*', '', src)
     src = re.sub(r'<!-- dev\.html: página fuente[^>]*-->\n?', '', src)
     s = src.replace('<html lang="es">', '<html lang="en">')
-    s = s.replace('<head>\n<meta charset="utf-8">', '<head>\n<meta charset="utf-8">\n<base href="../">', 1)
+    s = s.replace('<head>\n<meta charset="utf-8">', '<head>\n<meta charset="utf-8">\n<base href="/">', 1)
     home_en = '''<!-- home-seo:begin -->
     <details class="home-seo">
       <summary>Learn about PokéSurvivor</summary>
@@ -728,7 +728,7 @@ def game_en():
         <h3>Can I play with friends?</h3>
         <p>Yes. Online co-op supports up to four players. You can play as a guest or create an account to keep your progress and profile.</p>
         <h3>Is this an official Pokémon game?</h3>
-        <p>No. It is a free, non-profit fan project and is not affiliated with Nintendo, Creatures, GAME FREAK or The Pokémon Company. Read the <a href="https://github.com/JPTER78/pokesurvivor" rel="noopener">public project source</a> or the <a href="en/guide/">game guide</a> for more details.</p>
+        <p>No. It is a free, non-profit fan project and is not affiliated with Nintendo, Creatures, GAME FREAK or The Pokémon Company. Read the <a href="https://github.com/JPTER78/pokesurvivor" rel="noopener">public project source</a> or the <a href="/en/guide/">game guide</a> for more details.</p>
       </div>
     </details>
     <!-- home-seo:end -->'''
@@ -756,7 +756,7 @@ def game_en():
     # Enlaces a las páginas: las de inglés.
     s = s.replace('href="https://pokesurvivor.xyz/"', 'href="https://pokesurvivor.xyz/"', 1)
     s = s.replace('hreflang="en" href="https://pokesurvivor.xyz/en/"', 'hreflang="en" href="https://pokesurvivor.xyz/en/"')
-    s = s.replace('href="guia/"', 'href="en/guide/"').replace('href="pokedex/"', 'href="en/pokedex/"')
+    s = s.replace('href="guia/"', 'href="/en/guide/"').replace('href="pokedex/"', 'href="/en/pokedex/"')
     s = s.replace('"description": "PokéSurvivor es un juego de supervivencia con Pokémon para navegador: elige compañero, supera oleadas, evoluciona movimientos, entra en grietas legendarias y juega en cooperativo con hasta 4 amigos."',
                   '"description": "PokéSurvivor is a Pokémon survival game for the browser: pick a partner, survive waves, evolve moves, enter legendary rifts and play co-op with up to 4 friends."')
     s = s.replace('"inLanguage": "es"', '"inLanguage": ["es", "en"]')
@@ -773,7 +773,7 @@ def game_zh_hant():
     src = re.sub(r'<meta name="robots" content="noindex">\s*', '', src)
     src = re.sub(r'<!-- dev\.html: página fuente[^>]*-->\n?', '', src)
     s = src.replace('<html lang="es">', '<html lang="zh-Hant">')
-    s = s.replace('<head>\n<meta charset="utf-8">', '<head>\n<meta charset="utf-8">\n<base href="../">', 1)
+    s = s.replace('<head>\n<meta charset="utf-8">', '<head>\n<meta charset="utf-8">\n<base href="/">', 1)
     home_zh = '''<!-- home-seo:begin -->
     <details class="home-seo">
       <summary>了解 PokéSurvivor</summary>
@@ -794,7 +794,7 @@ def game_zh_hant():
         <h3>可以和好友一起玩嗎？</h3>
         <p>可以。線上合作最多支援四位玩家。你可以使用訪客身分遊玩，也可以建立帳號保存進度與個人檔案。</p>
         <h3>這是官方寶可夢遊戲嗎？</h3>
-        <p>不是。這是免費且非營利的粉絲專案，與 Nintendo、Creatures、GAME FREAK 或 The Pokémon Company 無關。你可以查看<a href="https://github.com/JPTER78/pokesurvivor" rel="noopener">公開專案原始碼</a>或<a href="zh-hant/guide/">遊戲指南</a>了解更多。</p>
+        <p>不是。這是免費且非營利的粉絲專案，與 Nintendo、Creatures、GAME FREAK 或 The Pokémon Company 無關。你可以查看<a href="https://github.com/JPTER78/pokesurvivor" rel="noopener">公開專案原始碼</a>或<a href="/zh-hant/guide/">遊戲指南</a>了解更多。</p>
       </div>
     </details>
     <!-- home-seo:end -->'''
@@ -816,7 +816,7 @@ def game_zh_hant():
     for old, new in replacements:
         assert old in s, old[:60]
         s = s.replace(old, new)
-    s = s.replace('href="guia/"', 'href="zh-hant/guide/"').replace('href="pokedex/"', 'href="en/pokedex/"')
+    s = s.replace('href="guia/"', 'href="/zh-hant/guide/"').replace('href="pokedex/"', 'href="/en/pokedex/"')
     s = s.replace('"description": "PokéSurvivor es un juego de supervivencia con Pokémon para navegador: elige compañero, supera oleadas, evoluciona movimientos, entra en grietas legendarias y juega en cooperativo con hasta 4 amigos."',
                   '"description": "PokéSurvivor 是一款可在瀏覽器遊玩的寶可夢生存遊戲：選擇夥伴、撐過敵人潮、進化招式、挑戰傳說裂隙，並與最多四位好友合作。"')
     s = s.replace('"inLanguage": "es"', '"inLanguage": "zh-Hant"')
