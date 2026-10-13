@@ -252,4 +252,70 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://pokesurvivor.xyz/en/support/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://pokesurvivor.xyz/apoyar/" />
   </url>
+  <url>
+    <loc>https://pokesurvivor.xyz/compras/</loc>
+    <lastmod>2026-10-13T00:00:00.000Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pokesurvivor.xyz/compras/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://pokesurvivor.xyz/en/purchases/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://pokesurvivor.xyz/zh-hant/purchases/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pokesurvivor.xyz/compras/" />
+  </url>
+  <url>
+    <loc>https://pokesurvivor.xyz/en/purchases/</loc>
+    <lastmod>2026-10-13T00:00:00.000Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pokesurvivor.xyz/compras/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://pokesurvivor.xyz/en/purchases/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://pokesurvivor.xyz/zh-hant/purchases/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pokesurvivor.xyz/compras/" />
+  </url>
+  <url>
+    <loc>https://pokesurvivor.xyz/zh-hant/purchases/</loc>
+    <lastmod>2026-10-13T00:00:00.000Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="es" href="https://pokesurvivor.xyz/compras/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://pokesurvivor.xyz/en/purchases/" />
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://pokesurvivor.xyz/zh-hant/purchases/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pokesurvivor.xyz/compras/" />
+  </url>
+  <url>
+    <loc>https://pokesurvivor.xyz/terms/</loc>
+    <lastmod>2026-10-13T00:00:00.000Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://pokesurvivor.xyz/privacy/</loc>
+    <lastmod>2026-10-13T00:00:00.000Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://pokesurvivor.xyz/en/terms/</loc>
+    <lastmod>2026-10-13T00:00:00.000Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://pokesurvivor.xyz/en/privacy/</loc>
+    <lastmod>2026-10-13T00:00:00.000Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://pokesurvivor.xyz/zh-hant/terms/</loc>
+    <lastmod>2026-10-13T00:00:00.000Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://pokesurvivor.xyz/zh-hant/privacy/</loc>
+    <lastmod>2026-10-13T00:00:00.000Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
 </urlset>
