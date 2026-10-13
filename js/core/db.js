@@ -306,6 +306,7 @@ G.DB = (() => {
   const PUSH_GAP = 30 * 60 * 1000, PUSH_GAP_URGENT = 30 * 1000, HIDE_GAP = 10 * 60 * 1000;
   let syncState = 'local';           // 'ok' | 'syncing' | 'pending' | 'offline' | 'local'
   const listeners = new Set();
+  const commitListeners = new Set();
 
   function setSync(s) { syncState = s; listeners.forEach(fn => { try { fn(s); } catch (e) { /* nada */ } }); }
 
@@ -610,6 +611,7 @@ G.DB = (() => {
     pending = true;
     setSync('pending');
     schedulePush(Math.max(1200, (urgent ? PUSH_GAP_URGENT : PUSH_GAP) - (Date.now() - lastPush)));
+    commitListeners.forEach(fn => { try { fn(); } catch (e) { /* nada */ } });
     return true;
   }
 
@@ -714,6 +716,7 @@ G.DB = (() => {
     get save() { return save; },
     get loggedIn() { return !!save; },
     get storageOk() { return storageOk; },
+    onCommit(fn) { commitListeners.add(fn); },
     START_COINS
   };
 })();

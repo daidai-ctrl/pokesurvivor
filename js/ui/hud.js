@@ -25,6 +25,35 @@ G.HUD = (() => {
     }
   }
 
+  /** Insignia del campeón: siempre es el primer puesto del histórico en solitario. */
+  function drawChampion(ctx, w) {
+    if (!G.Ranking || !G.Ranking.getChampion) return;
+    const champion = G.Ranking.getChampion();
+    if (!champion) return;
+    const name = (champion.names && champion.names[0]) || '???';
+    const cardW = Math.min(292, Math.max(214, Math.floor(w * .34)));
+    const x = 14, y = 70, cardH = 46;
+    ctx.save();
+    roundRect(ctx, x + 2, y + 3, cardW, cardH, 10);
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fill();
+    roundRect(ctx, x, y, cardW, cardH, 10);
+    const bg = ctx.createLinearGradient(x, y, x + cardW, y + cardH);
+    bg.addColorStop(0, 'rgba(74,49,125,.96)');
+    bg.addColorStop(.55, 'rgba(35,53,112,.96)');
+    bg.addColorStop(1, 'rgba(20,91,106,.94)');
+    ctx.fillStyle = bg; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#ffd23f'; ctx.stroke();
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.45)';
+    roundRect(ctx, x + 4, y + 4, cardW - 8, cardH - 8, 7); ctx.stroke();
+    G.Icons.draw(ctx, 'crown', x + 9, y + 9, 28);
+    ctx.textAlign = 'left';
+    ctx.font = F(800, 10); ctx.fillStyle = '#ffe37a';
+    ctx.fillText('Campeón mundial · Solo', x + 45, y + 16);
+    ctx.font = F(800, 16); ctx.fillStyle = '#fff';
+    ctx.fillText(name, x + 45, y + 36);
+    ctx.restore();
+  }
+
   function draw(ctx, w, h, pl, st) {
     ctx.save();
     ctx.textBaseline = 'alphabetic';
@@ -74,6 +103,9 @@ G.HUD = (() => {
       ctx.fillText(txt, bx + 6, py + 45);
       bx += tw + 5;
     }
+
+    // ---------- campeón mundial: histórico en solitario ----------
+    drawChampion(ctx, w);
 
     // ---------- reloj / bioma / kills ----------
     ctx.textAlign = 'center';

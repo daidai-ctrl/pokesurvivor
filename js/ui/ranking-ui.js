@@ -1,5 +1,5 @@
 /* ============ ranking-ui.js — pantalla del ranking ============
- * Pestañas Solo / Grupo, periodo (diario ... histórico), todos o sólo amigos,
+ * Pestañas Solo / Grupo / Colección, periodo (diario ... histórico), todos o sólo amigos,
  * filtro por Pokémon (sólo en el histórico) y tu puesto abajo aunque no salgas
  * en el top. Lo leído se guarda 30 min (ver ranking.js).
  */
@@ -26,15 +26,15 @@ G.RankingUI = (() => {
   function setDex(d) {
     dex = d;
     if (d && period !== 'a') period = 'a';
-    $('rk-clear').classList.toggle('hidden', !d);
+    $('rk-clear').classList.toggle('hidden', !d || mode === 'c');
     tabs(); load();
   }
 
-  function open() {
+  async function open() {
     if (!G.SocialUI.needOnline()) return;
     G.Analytics.event('ranking_opened');
     G.UI.show('scr-rank', true);
-    if (!G.Social.started) G.Social.start();
+    if (!G.Social.started) await G.Social.start();
     tabs();
     load();
   }
@@ -50,13 +50,26 @@ G.RankingUI = (() => {
         box.appendChild(b);
       }
     };
-    mk($('rk-mode'), [['s', `<b>${G.Icons.html('user', 16)} Solo</b>`], ['g', `<b>${G.Icons.html('friends', 16)} Grupo</b>`]],
-       mode, k => { mode = k; }, 'gen-tab');
+    mk($('rk-mode'), [
+      ['s', `<b>${G.Icons.html('user', 16)} Solo</b>`],
+      ['g', `<b>${G.Icons.html('friends', 16)} Grupo</b>`],
+      ['c', `<b>${G.Icons.html('book', 16)} Colección</b>`]
+    ], mode, k => {
+      mode = k;
+      if (k === 'c') { dex = null; $('rk-poke').value = ''; }
+    }, 'gen-tab');
     mk($('rk-period'), G.Ranking.PERIODS, period, k => {
       period = k;
       if (k !== 'a' && dex) { dex = null; $('rk-poke').value = ''; $('rk-clear').classList.add('hidden'); }
     }, 'chip');
     mk($('rk-scope'), [['all', 'Todos'], ['friends', 'Sólo amigos']], scope, k => { scope = k; }, 'chip');
+    $('rk-period').classList.toggle('hidden', mode === 'c');
+    $('rk-poke').classList.toggle('hidden', mode === 'c');
+    $('rk-clear').classList.toggle('hidden', !dex || mode === 'c');
+    $('rk-collection-info').classList.toggle('hidden', mode !== 'c');
+    $('rk-title').innerHTML = mode === 'c'
+      ? 'Ranking <span class="sub" style="font-size:15px">· colección histórica</span>'
+      : 'Ranking <span class="sub" style="font-size:15px">· tiempo aguantado</span>';
   }
 
   const fmt = t => t >= 3600 ? Math.floor(t / 3600) + ':' + G.U.mmss(t % 3600).padStart(5, '0') : G.U.mmss(t);
@@ -66,6 +79,7 @@ G.RankingUI = (() => {
     const list = $('rk-list');
     list.innerHTML = '<p class="sub">Cargando…</p>';
     $('rk-me').innerHTML = '';
+    if (mode === 'c') return loadCollection(my);
     let rows = [], me = null;
     try {
       [rows, me] = await Promise.all([
@@ -100,6 +114,22 @@ G.RankingUI = (() => {
       : (en ? `<span translate="no">You don't have a ${where} record ${pn} yet.</span>` : `Aún no tienes marca ${pn} ${where}.`);
   }
 
+  async function loadCollection(my) {
+    $('rk-collection-info').innerHTML = 'Puntuación: Común 1 · Poco común 3 · Rara 6 · Épica 12 · Legendaria 25 · Shiny ×2';
+    const own = G.Ranking.collectionStats(G.DB.save);
+    await G.Ranking.syncCollection();
+    const rows = await G.Ranking.collectionTop(scope === 'friends');
+    if (my !== token) return;
+    const list = $('rk-list');
+    list.innerHTML = '';
+    if (!rows.length) list.innerHTML = '<p class="sub">Todavía no hay colecciones publicadas. ¡Sé el primero!</p>';
+    const uid = G.Social.uid;
+    rows.forEach((r, i) => list.appendChild(collectionRow(r, i + 1, r.uid === uid)));
+    $('rk-me').innerHTML = G.Social.me
+      ? `Tu colección: <b class="gold">${own.score.toLocaleString('es')} puntos</b> · ${own.ownedCount}/${G.DEX.length} especies · ${own.shinyCount} shiny`
+      : 'Elige un apodo (en Amigos) para publicar tu colección.';
+  }
+
   function rowEl(r, pos, mine) {
     const el = document.createElement('div');
     el.className = 'rk-row' + (mine ? ' mine' : '') + (pos <= 3 ? ' top' + pos : '');
@@ -112,6 +142,16 @@ G.RankingUI = (() => {
       `<span class="who"><b translate="no">${r.names.map((n, i) => `<a href="#" class="plink" data-u="${esc(r.uids[i] || '')}">${esc(n)}</a>`).join(' · ')}</b><small>Nv. ${r.lv || 1} · ${(r.kills || 0).toLocaleString('es')} derrotados</small></span>
        <span class="time">${fmt(r.t)}</span>`);
     el.querySelectorAll('.plink').forEach(a => { a.onclick = e => { e.preventDefault(); G.ProfileUI.show(a.dataset.u); }; });
+    return el;
+  }
+
+  function collectionRow(r, pos, mine) {
+    const el = document.createElement('div');
+    el.className = 'rk-row rk-collection-row' + (mine ? ' mine' : '') + (pos <= 3 ? ' top' + pos : '');
+    el.insertAdjacentHTML('beforeend', `<span class="pos">${pos <= 3 ? G.Icons.html('trophy', 20) : ''}${pos}</span>`);
+    el.insertAdjacentHTML('beforeend', `<span class="collection-mark">${G.Icons.html(pos === 1 ? 'crown' : 'book', 28)}</span>`);
+    el.insertAdjacentHTML('beforeend', `<span class="who"><b translate="no">${esc(r.name || '???')}</b><small>${r.ownedCount || 0}/${G.DEX.length} especies · ${r.shinyCount || 0} shiny</small></span>`);
+    el.insertAdjacentHTML('beforeend', `<span class="collection-score"><b>${(r.score || 0).toLocaleString('es')}</b><small>pts</small></span>`);
     return el;
   }
 

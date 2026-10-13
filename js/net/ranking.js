@@ -1,4 +1,4 @@
-/* ============ ranking.js — clasificación de tiempo aguantado ============
+/* ============ ranking.js — clasificación de tiempo y colección ============
  * Firestore (pensado para gastar lo mínimo del plan gratuito):
  *
  *   lbs/{tabla}        RESUMEN: el top 50 de la tabla en UN documento
@@ -15,6 +15,9 @@
  *     s_all_p25     histórico sólo con Pikachu (el filtro por Pokémon sólo
  *                   existe en el histórico: así cada partida escribe la mitad)
  *   id = tu uid (solitario) o los uid del equipo ordenados y unidos con "_".
+ *
+ *   collections/{uid}  resumen público de la colección histórica:
+ *                      { uid, name, score, ownedCount, shinyCount, updatedAt }
  *
  * Ahorros:
  *   - Lo leído se guarda 30 min en el navegador (cambiar de pestaña y volver: 0).
@@ -37,6 +40,9 @@ G.Ranking = (() => {
   //  Pokémon y escribía; ahora también sólo el top 50.)
   const TOP_ONLY = new Set(['d', 'w', 'm', 'p']);
   const TOP = 50;
+  const COLLECTION_POINTS = { 1: 1, 2: 3, 3: 6, 4: 12, 5: 25 };
+  const COLLECTION_PUSH_GAP = 30 * 1000;
+  const CHAMPION_TTL = 5 * 60 * 1000;
   // Las runs de menos de 1 minuto no se suben (casi nunca entran en una tabla
   // y eran muchas lecturas y escrituras para nada).
   const MIN_T = 60;
@@ -131,6 +137,62 @@ G.Ranking = (() => {
   const rowOf = (id, v) => ({ id, t: v.t, uids: v.uids || [], names: v.names || [], dex: v.dex || [], shiny: v.shiny || [], lv: v.lv, kills: v.kills });
   const sorted = top => Object.entries(top || {}).map(([id, v]) => rowOf(id, v)).sort((a, b) => b.t - a.t);
 
+  // ---------------- campeón histórico y colección ----------------
+
+  let championCache = null, championAt = 0, championInflight = null;
+  let collectionWriteAt = 0, collectionWrite = null, collectionCache = null;
+
+  /** Calcula la puntuación desde la colección real del jugador. Los repetidos no suman. */
+  function collectionStats(save = G.DB.save) {
+    const owned = save && save.owned || {}, shiny = save && save.shiny || {};
+    let score = 0, ownedCount = 0, shinyCount = 0;
+    const rarity = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const p of G.DEX) {
+      const base = COLLECTION_POINTS[p.rarity] || 0;
+      if (owned[p.dex]) { score += base; ownedCount++; rarity[p.rarity] = (rarity[p.rarity] || 0) + 1; }
+      if (shiny[p.dex] && G.Sprites.hasShiny(p.dex)) { score += base * 2; shinyCount++; }
+    }
+    return { score, ownedCount, shinyCount, rarity };
+  }
+
+  /** Solicita el campeón en segundo plano; HUD sólo muestra el último valor conocido. */
+  function getChampion(force = false) {
+    const fb = fbx();
+    if (!fb) return championCache;
+    const now = Date.now();
+    if (!force && championAt && now - championAt < CHAMPION_TTL) return championCache;
+    if (championInflight) return championCache;
+    championInflight = sumRef('s_all').get().then(s => {
+      championCache = sorted(s.exists ? s.data().top : {})[0] || null;
+      championAt = Date.now();
+      return championCache;
+    }).catch(e => {
+      championAt = Date.now();
+      console.warn('[Ranking] campeón:', e.code || e.message);
+      return championCache;
+    }).finally(() => { championInflight = null; });
+    return championCache;
+  }
+
+  async function syncCollection(force = false) {
+    const fb = fbx();
+    if (!fb || !G.Social.me || !G.DB.save) return collectionStats(G.DB.save);
+    const now = Date.now();
+    const stats = collectionStats(G.DB.save);
+    if (!force && now - collectionWriteAt < COLLECTION_PUSH_GAP) return stats;
+    if (collectionWrite) return collectionWrite;
+    const data = {
+      uid: fb.uid, name: G.Social.me.name, score: stats.score,
+      ownedCount: stats.ownedCount, shinyCount: stats.shinyCount,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    collectionWrite = fb.fs.collection('collections').doc(fb.uid).set(data)
+      .then(() => { collectionWriteAt = Date.now(); collectionCache = null; return stats; })
+      .catch(e => { console.warn('[Ranking] colección:', e.code || e.message); return stats; })
+      .finally(() => { collectionWrite = null; });
+    return collectionWrite;
+  }
+
   /** Guarda la entrada en cada tabla donde mejore. → periodos mejorados */
   async function store(boards, id, entry) {
     const fb = fbx();
@@ -213,6 +275,7 @@ G.Ranking = (() => {
     const boards = PERIODS.map(([p]) => ['s_' + ids[p], p]);
     boards.push(['s_all_p' + r.dex, 'p']);
     const better = await store(boards, fb.uid, entry);
+    championAt = 0;
     announce(better);
     return better;
   }
@@ -281,6 +344,32 @@ G.Ranking = (() => {
     const all = new Map();
     for (const r of [...inTop, ...extra]) all.set(r.id, r);
     return [...all.values()].sort((a, c) => c.t - a.t).slice(0, TOP);
+  }
+
+  /** Top histórico por colección; se consulta un resumen público por jugador. */
+  async function collectionTop(friendsOnly = false) {
+    const fb = fbx();
+    if (!fb) return [];
+    if (!friendsOnly && collectionCache && Date.now() - collectionCache.at < 2 * 60 * 1000) return collectionCache.rows;
+    try {
+      let docs;
+      if (friendsOnly) {
+        const circle = [fb.uid, ...G.Social.friends.filter(f => f.status === 'ok').map(f => f.uid)].slice(0, 30);
+        docs = await Promise.all(circle.map(uid => fb.fs.collection('collections').doc(uid).get().catch(() => null)));
+      } else {
+        const snap = await fb.fs.collection('collections').orderBy('score', 'desc').limit(TOP).get();
+        docs = snap.docs;
+      }
+      const rows = docs.filter(d => d && d.exists).map(d => {
+        const v = d.data();
+        return { uid: d.id, name: v.name || '???', score: v.score | 0, ownedCount: v.ownedCount | 0, shinyCount: v.shinyCount | 0 };
+      }).sort((a, b) => (b.score - a.score) || (b.ownedCount - a.ownedCount) || (b.shinyCount - a.shinyCount) || a.name.localeCompare(b.name)).slice(0, TOP);
+      if (!friendsOnly) collectionCache = { at: Date.now(), rows };
+      return rows;
+    } catch (e) {
+      console.warn('[Ranking] colección top:', e.code || e.message);
+      return [];
+    }
   }
 
   /** Tu puesto en la tabla (aunque no salgas en el top). → { pos, t, row } | null */
@@ -362,7 +451,13 @@ G.Ranking = (() => {
       }
     }).catch(() => {})));
     try { localStorage.removeItem(bestKey()); } catch (e) { /* nada */ }
+    await fbx().fs.collection('collections').doc(fbx().uid).delete().catch(() => {});
   }
 
-  return { PERIODS, periodIds, board, runStarted, submitSolo, submitGroup, top, myRank, removeMine };
+  if (G.DB.onCommit) G.DB.onCommit(() => { syncCollection(); });
+
+  return {
+    PERIODS, periodIds, board, runStarted, submitSolo, submitGroup, top, myRank, removeMine,
+    getChampion, collectionStats, syncCollection, collectionTop
+  };
 })();

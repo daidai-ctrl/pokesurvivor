@@ -541,6 +541,13 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .rk-row .time { font-size: 22px; font-weight: 700; color: #fff; }
 .rk-row.mine { border-color: var(--gold); background: rgba(255,210,63,.1); }
 .rk-me { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,.25); font-size: 15px; min-height: 20px; }
+.rk-collection-row { grid-template-columns: 54px 42px 1fr auto; min-height: 54px; }
+.rk-collection-row .collection-mark { display: flex; align-items: center; justify-content: center; }
+.rk-collection-row .collection-score { display: flex; flex-direction: column; align-items: flex-end; color: var(--gold); }
+.rk-collection-row .collection-score b { font-size: 22px; line-height: 1; }
+.rk-collection-row .collection-score small { color: var(--muted); font-size: 11px; margin-top: 3px; }
+.rk-collection-row.top1 { background: linear-gradient(90deg, rgba(255,210,63,.2), rgba(110,74,170,.16)); border-color: rgba(255,210,63,.65); }
+.rk-collection-info { margin: 8px 0 10px; padding: 8px 12px; border-radius: 8px; background: rgba(0,0,0,.22); color: var(--muted); font-size: 13px; }
 
 .cards.done .card { pointer-events: none; opacity: .45; }
 .cards.done .card.picked { opacity: 1; border-color: var(--gold); }
@@ -549,6 +556,8 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 @media (max-width: 760px) {
   .lobby-members { grid-template-columns: repeat(2, 1fr); }
   .rk-row { grid-template-columns: 40px auto 1fr auto; gap: 6px; }
+  .rk-collection-row { grid-template-columns: 40px 34px 1fr auto; }
+  .rk-collection-row .collection-score b { font-size: 18px; }
 }
 
 /* ---------- tickets y mejoras por Pokémon ---------- */

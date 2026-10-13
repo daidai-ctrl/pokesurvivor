@@ -235,6 +235,32 @@ service cloud.firestore {
       allow create, update: if signedIn() && validTop(board);
     }
 
+    // Resumen público de la colección histórica. El cliente calcula la
+    // puntuación a partir de su propia partida; los límites evitan valores
+    // absurdos, y la validación fuerte de la colección queda preparada para
+    // una futura función de servidor si el ranking crece.
+    match /collections/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && me() == uid
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'score', 'ownedCount', 'shinyCount', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 16
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.score <= 100000
+        && request.resource.data.ownedCount is int
+        && request.resource.data.ownedCount >= 0
+        && request.resource.data.ownedCount <= 1100
+        && request.resource.data.shinyCount is int
+        && request.resource.data.shinyCount >= 0
+        && request.resource.data.shinyCount <= 1100
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if signedIn() && me() == uid;
+    }
+
     // Presencia aproximada: "en línea" si at es de hace menos de unos minutos.
     match /pres/{uid} {
       allow read: if signedIn();
