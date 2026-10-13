@@ -191,6 +191,12 @@ G.DB = (() => {
       });
     }
     for (const k in older.stats || {}) r.stats[k] = Math.max(r.stats[k] || 0, older.stats[k] || 0);
+    // Tickets are additive account currency. Never let a newer copy with an
+    // older ticket count erase tickets collected or granted on another device.
+    r.tickets = r.tickets || { t1: 0, t10: 0 };
+    const ot = older.tickets || {};
+    r.tickets.t1 = Math.max(Number(r.tickets.t1) || 0, Number(ot.t1) || 0);
+    r.tickets.t10 = Math.max(Number(r.tickets.t10) || 0, Number(ot.t10) || 0);
     if (r.starter == null) r.starter = older.starter;
     if (r.personality == null) r.personality = older.personality;
     if (r.partner == null || !r.owned[r.partner]) { r.partner = older.partner; r.partnerShiny = older.partnerShiny; }
@@ -646,6 +652,16 @@ G.DB = (() => {
     return true;
   }
 
+  /** Applies a server-authoritative save after a paid grant is claimed. */
+  function applyServerSave(remote) {
+    if (!save || guest || !remote) return false;
+    applyInPlace(merge(plain(save), migrate(remote, save.name)));
+    write(K_CLOUD + uid, save);
+    pending = false;
+    setSync('ok');
+    return true;
+  }
+
   /** Funciones que se ejecutan al cerrar sesión o borrar la cuenta (amigos, salas...). */
   const leaveHooks = [];
 
@@ -730,7 +746,7 @@ G.DB = (() => {
   }
 
   return {
-    ready, register, login, loginWithGoogle, playAsGuest, logout, commit, deleteAccount, flush: pushNow,
+    ready, register, login, loginWithGoogle, playAsGuest, logout, commit, deleteAccount, flush: pushNow, applyServerSave,
     owns, grant, ownsShiny, grantShiny, merge, setName, upgradesOf,
     onSync(fn) { listeners.add(fn); },
     onLeave(fn) { leaveHooks.push(fn); },

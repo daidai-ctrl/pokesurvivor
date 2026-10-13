@@ -1,0 +1,16 @@
+name = "pokesurvivor-paypal"
+main = "paypal-worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = true
+
+# Keep PayPal in its own Worker. The D1 binding is shared only so the Worker
+# can maintain the independent order/grant ledger and merge a paid grant into
+# the already-synced save without touching the existing data Worker routes.
+[[d1_databases]]
+binding = "pokesurvivor_data"
+database_name = "pokesurvivor-data"
+database_id = "2835d689-b29f-4757-bb9d-5fb224016384"
+
+# Add the custom domain only after Sandbox testing is complete:
+# routes = [ { pattern = "paypal.pokesurvivor.xyz", custom_domain = true } ]

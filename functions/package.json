@@ -3,8 +3,11 @@
   "private": true,
   "description": "Portero de cuentas: tope de cuentas nuevas al mes (ver index.js).",
   "main": "index.js",
-  "engines": { "node": "20" },
+  "engines": {
+    "node": "20"
+  },
   "dependencies": {
+    "@waffo/pancake-ts": "^0.25.0",
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^6.1.0"
   }

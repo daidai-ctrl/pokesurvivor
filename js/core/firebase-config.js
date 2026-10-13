@@ -24,6 +24,11 @@ G.FIREBASE_CONFIG = {
 // accounts keep their uid while Firestore data is migrated safely.
 G.FIREBASE_DATA_URL = 'https://api.pokesurvivor.xyz';
 
+// PayPal is intentionally a separate Worker. Keep this empty until the
+// Sandbox Worker has a preview URL; an empty value hides the PayPal button so
+// a half-configured payment path can never be shown to players.
+G.PAYPAL_API_URL = 'https://pokesurvivor-paypal.zzy1848599547.workers.dev';
+
 /* Ejemplo de cómo debe quedar:
 G.FIREBASE_CONFIG = {
   apiKey: 'AIza...',

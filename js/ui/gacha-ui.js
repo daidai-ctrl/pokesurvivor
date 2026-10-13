@@ -5,6 +5,12 @@ G.GachaUI = (() => {
   const $ = G.UI.$;
   let busy = false;
   let gen = 1;
+  const WAFFO_CHECKOUT_URL = 'https://pancake.waffo.ai/store/poke-earn2tza/product/PROD_4pCwuWsV3A6kPZ871iQvIz?type=onetime&currency=USD';
+  const PURCHASE_LABEL = {
+    es: 'Próximamente · Comprar en Waffo',
+    en: 'Coming soon · Buy on Waffo',
+    'zh-hant': '敬請期待 · 前往 Waffo'
+  };
 
   function init() {
     $('pull-1').onclick = () => pull(1);
@@ -13,8 +19,11 @@ G.GachaUI = (() => {
     $('pull-close').onclick = close;
     const purchase = $('gacha-purchase');
     if (purchase) {
-      purchase.href = G.I18n.lang === 'en' ? '/en/purchases/' : G.I18n.lang === 'zh-hant' ? '/zh-hant/purchases/' : '/compras/';
+      purchase.href = WAFFO_CHECKOUT_URL;
+      purchase.textContent = PURCHASE_LABEL[G.I18n.lang] || PURCHASE_LABEL.es;
+      purchase.title = PURCHASE_LABEL[G.I18n.lang] || PURCHASE_LABEL.es;
     }
+    if (G.PayPalUI) G.PayPalUI.init();
 
     const tabs = $('gacha-gens');
     G.Gacha.BANNERS.forEach(b => {
@@ -128,5 +137,5 @@ G.GachaUI = (() => {
     refresh();
   }
 
-  return { init, open, get open_() { return !$('pull-fx').classList.contains('hidden'); } };
+  return { init, open, refresh, get open_() { return !$('pull-fx').classList.contains('hidden'); } };
 })();
