@@ -372,9 +372,17 @@ G.DB = (() => {
     if (G.Signups) G.Signups.report(u);          // tope de cuentas del mes (net/signups.js)
     const cached = read(K_CLOUD + uid);
     let remote = null, online = true;
+    const cf = G.CFData && G.CFData.enabled();
+    let legacyRead = false;
     try {
-      const snap = await docRef().get();
-      remote = snap.exists ? snap.data().save : null;
+      if (cf) remote = await G.CFData.getSave();
+      // Una cuenta aún no migrada se lee una sola vez desde Firestore y se
+      // copia al Worker en el primer push posterior.
+      if (!remote) {
+        legacyRead = true;
+        const snap = await docRef().get();
+        remote = snap.exists ? snap.data().save : null;
+      }
     } catch (e) {
       if (!cached) throw e;                // sin conexión y sin copia: no hay nada que abrir
       online = false;
@@ -393,7 +401,7 @@ G.DB = (() => {
     // terminar la subida, y con Firebase lento se tardaba hasta 9 s en entrar.
     // (Comparar el texto entero daba "distinto" casi siempre y se subía en cada
     // entrada: ahora sólo si esta copia es más nueva que la de la nube.)
-    const same = remote && !opts.legacy && (!cached || (cached.updated || 0) <= (remote.updated || 0));
+    const same = remote && !opts.legacy && !legacyRead && (!cached || (cached.updated || 0) <= (remote.updated || 0));
     lastPush = Date.now();       // la primera compra o ticket no sube al momento: espera como las demás
     if (!online) { pending = true; setSync('offline'); scheduleRetry(); }
     else if (same) setSync('ok');
@@ -420,6 +428,23 @@ G.DB = (() => {
     pending = false;
     lastPush = Date.now();
     setSync('syncing');
+    if (G.CFData && G.CFData.enabled()) {
+      let failed = false;
+      pushing = G.CFData.putSave(plain(save)).then(() => {
+        fails = 0; rejects = 0;
+        setSync(pending ? 'pending' : 'ok');
+        if (G.UI && G.UI.refreshCoins) G.UI.refreshCoins();
+      }).catch(e => {
+        console.warn('[DB] Cloudflare no pudo sincronizar:', e.code || e.message);
+        pending = true; failed = true;
+        setSync('offline');
+        scheduleRetry();
+      }).finally(() => {
+        pushing = null;
+        if (!failed && pending && syncState === 'pending') schedulePush(Math.max(1500, PUSH_GAP - (Date.now() - lastPush)));
+      });
+      return pushing;
+    }
     let merged = null;
     const tr = fs.runTransaction(async tx => {
       const ref = docRef();
@@ -459,10 +484,16 @@ G.DB = (() => {
   let rejects = 0;
   async function adoptRemote() {
     try {
-      const snap = await docRef().get();
-      if (snap.exists && save) {
-        applyInPlace(migrate(snap.data().save));
+      const remote = G.CFData && G.CFData.enabled() ? await G.CFData.getSave() : null;
+      if (remote && save) {
+        applyInPlace(migrate(remote));
         write(K_CLOUD + uid, save);
+      } else if (!(G.CFData && G.CFData.enabled())) {
+        const snap = await docRef().get();
+        if (snap.exists && save) {
+          applyInPlace(migrate(snap.data().save));
+          write(K_CLOUD + uid, save);
+        }
       }
       pending = false;
       setSync('ok');
@@ -664,7 +695,8 @@ G.DB = (() => {
       clearTimeout(pushT); clearTimeout(retryT); pending = false;
       stopListening();
       for (const fn of leaveHooks) await fn('delete');
-      await docRef().delete();
+      if (G.CFData && G.CFData.enabled()) await G.CFData.deleteSave().catch(() => {});
+      else await docRef().delete();
       remove(K_CLOUD + uid);
       await auth.currentUser.delete();
       user = key = save = uid = null;

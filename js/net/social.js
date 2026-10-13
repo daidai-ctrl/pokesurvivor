@@ -33,7 +33,7 @@ G.Social = (() => {
   let me = null;                    // { uid, name }
   let friends = new Map();          // otherUid -> { uid, name, pid, status: 'ok'|'in'|'out', online, play }
   let unFriends = null;
-  let beatT = 0, presAt = 0, unInv = null;
+  let beatT = 0, presAt = 0, unInv = null, friendPollT = 0, invitePollT = 0;
   const pres = new Map();           // otherUid -> { online, play, room, seen } (lo último leído)
   const sentInv = new Set();        // a quién invitaste (para retirarlo al salir)
   let room = null;                  // { id, host, isHost, members: [{ uid, name, dex, shiny }] }
@@ -61,12 +61,22 @@ G.Social = (() => {
     const NICK = 'ps.nick.' + uid;
     let cachedNick = null;
     try { cachedNick = localStorage.getItem(NICK); } catch (e) { /* nada */ }
-    const prof = cachedNick ? { name: cachedNick }
-      : await fb.fs.collection('profiles').doc(uid).get().then(s => s.exists ? s.data() : null).catch(() => null);
+    let prof = cachedNick ? { name: cachedNick } : null;
+    let legacyProfile = false;
+    if (!prof && G.CFData && G.CFData.enabled()) prof = await G.CFData.getProfile(uid).catch(() => null);
+    if (!prof) {
+      prof = await fb.fs.collection('profiles').doc(uid).get().then(s => s.exists ? s.data() : null).catch(() => null);
+      legacyProfile = !!prof;
+    }
     if (prof) {
       me = { uid, name: prof.name };
       if (G.DB.user !== prof.name) G.DB.setName(prof.name);
       try { localStorage.setItem(NICK, prof.name); } catch (e) { /* nada */ }
+      if ((legacyProfile || cachedNick) && G.CFData && G.CFData.enabled()) {
+        const legacy = Object.assign({}, prof, { name: prof.name, lower: prof.lower || String(prof.name).toLowerCase(), at: Date.now() });
+        G.CFData.putProfile(legacy).catch(() => {});
+        if (legacy.lower) G.CFData.claimName(legacy.lower).catch(() => {});
+      }
     }
     else if (G.DB.nameAccount) {
       // Cuentas de nombre y contraseña: su nombre ya es único, se usa de apodo.
@@ -82,6 +92,23 @@ G.Social = (() => {
     name = (name || '').trim();
     if (!VALID.test(name)) return { ok: false, error: 'El apodo debe tener 3-16 letras, números o _.' };
     const lower = name.toLowerCase();
+    if (G.CFData && G.CFData.enabled()) {
+      try {
+        await G.CFData.claimName(lower);
+        await G.CFData.putProfile({ name, lower, at: Date.now() });
+      } catch (e) {
+        if (e.code === 'taken') return { ok: false, error: 'Ese apodo ya lo tiene otro jugador.' };
+        console.warn('[Social] apodo CF:', e.code || e.message);
+        return { ok: false, error: 'No se pudo guardar el apodo (' + (e.code || 'error') + ').' };
+      }
+      me = { uid, name };
+      try { localStorage.setItem('ps.nick.' + uid, name); } catch (e) { /* nada */ }
+      G.DB.setName(name);
+      G.Analytics.event('nickname_created');
+      if (started && !beatT) online();
+      publishProfile(true);
+      return { ok: true };
+    }
     try {
       await fb.fs.runTransaction(async tx => {
         const nref = fb.fs.collection('names').doc(lower);
@@ -119,6 +146,23 @@ G.Social = (() => {
   /** Invitaciones a salas: sólo te pueden llegar de amigos, así que sin amigos no se escucha (lecturas). */
   function listenInvites() {
     if (unInv || !fb) return;
+    if (G.CFData && G.CFData.enabled()) {
+      const poll = async () => {
+        try {
+          const rows = await G.CFData.invites();
+          const next = new Map();
+          rows.forEach(v => {
+            if (!v || (v.at && Date.now() - msOf(v.at) > INVITE_TTL)) { if (v && v.id) G.CFData.deleteInvite(v.id).catch(() => {}); return; }
+            const f = friends.get(v.from);
+            if (!f || f.status === 'ok') next.set(v.from, { from: v.from, name: v.name, room: v.room, at: msOf(v.at) || Date.now(), id: v.id });
+          });
+          invites.clear(); next.forEach((v, k) => invites.set(k, v)); emit('invites');
+        } catch (e) { console.warn('[Social] invitaciones CF:', e.code || e.message); }
+      };
+      poll(); invitePollT = setInterval(poll, 60000);
+      unInv = () => { clearInterval(invitePollT); invitePollT = 0; };
+      return;
+    }
     unInv = fb.fs.collection('inv').where('to', '==', uid).onSnapshot(snap => {
       snap.docChanges().forEach(ch => {
         const v = ch.doc.data();
@@ -135,6 +179,10 @@ G.Social = (() => {
     // Sin amigos nadie lo lee: no se gasta una escritura (cupo diario de Firebase).
     if (!fb || !me || !hasFriends()) return;
     lastBeat = Date.now();
+    if (G.CFData && G.CFData.enabled()) {
+      G.CFData.putPresence({ on, at: Date.now(), room: room ? room.id : '', play: playing }).catch(() => {});
+      return;
+    }
     fb.fs.collection('pres').doc(uid).set({ on, at: fts(), room: room ? room.id : '', play: playing }).catch(() => {});
   }
   function setPlaying(p) { if (playing !== !!p) { playing = !!p; writeStatus(); } }
@@ -150,7 +198,12 @@ G.Social = (() => {
     clearInterval(beatT); beatT = 0;
     document.removeEventListener('visibilitychange', onVisible);
     window.removeEventListener('pagehide', onHide);
-    if (me) await fb.fs.collection('pres').doc(uid).delete().catch(() => {});
+    if (me) {
+      if (G.CFData && G.CFData.enabled()) await G.CFData.deletePresence().catch(() => {});
+      else await fb.fs.collection('pres').doc(uid).delete().catch(() => {});
+    }
+    clearInterval(friendPollT); friendPollT = 0;
+    clearInterval(invitePollT); invitePollT = 0;
     if (why === 'delete') {
       try { localStorage.removeItem('ps.nick.' + uid); } catch (e) { /* nada */ }
       await deleteAll().catch(e => console.warn('[Social] borrar:', e));
@@ -162,6 +215,10 @@ G.Social = (() => {
 
   /** Al borrar la cuenta: amistades, marcas del ranking, perfil y apodo. */
   async function deleteAll() {
+    if (G.CFData && G.CFData.enabled()) {
+      await G.CFData.deleteAccount();
+      return;
+    }
     // Cada paso por separado: si uno falla, los demás se borran igual.
     const step = async (what, fn) => { try { await fn(); } catch (e) { console.warn('[Social] no se pudo borrar ' + what + ':', e.code || e.message); } };
     const del = async q => { const s = await q.get(); await Promise.all(s.docs.map(d => d.ref.delete().catch(() => {}))); };
@@ -181,6 +238,41 @@ G.Social = (() => {
   // ---------------- amigos ----------------
 
   function listenFriends() {
+    if (G.CFData && G.CFData.enabled()) {
+      let legacyChecked = false;
+      const poll = async () => {
+        try {
+          let list = await G.CFData.friendships();
+          if (!list.length && !legacyChecked) {
+            legacyChecked = true;
+            const snap = await fb.fs.collection('friendships').where('users', 'array-contains', uid).get().catch(() => null);
+            list = snap ? snap.docs.map(d => Object.assign({ id: d.id }, d.data())) : [];
+            list.forEach(f => G.CFData.putFriendship(f).catch(() => {}));
+          }
+          const next = new Map();
+          list.forEach(f => {
+            const users = Array.isArray(f.users) ? f.users : [];
+            const other = users[0] === uid ? users[1] : users[0];
+            if (!other) return;
+            next.set(other, Object.assign({
+              uid: other, pid: f.id || pidOf(users[0], users[1]), name: (f.names && f.names[other]) || '???',
+              status: f.status === 'ok' ? 'ok' : f.to === uid ? 'in' : 'out',
+              online: false, play: false, room: '', seen: 0
+            }, pres.get(other) || {}, { raw: f }));
+          });
+          const added = [...next.values()].some(f => f.status === 'ok' && (!friends.has(f.uid) || friends.get(f.uid).status !== 'ok'));
+          const hadFriends = hasFriends();
+          friends = next;
+          emit('friends');
+          if (!hadFriends && hasFriends()) writeStatus();
+          if (hasFriends()) listenInvites();
+          if (added) setTimeout(() => { if (started) refreshPresence(true); }, 2500);
+        } catch (e) { console.warn('[Social] amigos CF:', e.code || e.message); }
+      };
+      poll(); friendPollT = setInterval(poll, 60000);
+      unFriends = () => { clearInterval(friendPollT); friendPollT = 0; };
+      return;
+    }
     unFriends = fb.fs.collection('friendships').where('users', 'array-contains', uid).onSnapshot(snap => {
       const next = new Map();
       snap.forEach(d => {
@@ -214,6 +306,19 @@ G.Social = (() => {
     if (!fb || (!force && Date.now() - presAt < PRES_TTL)) return;
     presAt = Date.now();
     const ok = [...friends.values()].filter(f => f.status === 'ok');
+    if (G.CFData && G.CFData.enabled()) {
+      const rows = await G.CFData.presence(ok.map(f => f.uid)).catch(() => []);
+      const byUid = new Map(rows.map(v => [v.uid, v]));
+      const t = Date.now();
+      ok.forEach(f => {
+        const v = byUid.get(f.uid);
+        const on = !!(v && v.on && t - msOf(v.at) < ONLINE);
+        const p = { online: on, play: !!(on && v.play), room: on ? v.room : '', seen: v ? msOf(v.at) : 0 };
+        pres.set(f.uid, p); const cur = friends.get(f.uid); if (cur) Object.assign(cur, p);
+      });
+      emit('presence');
+      return;
+    }
     const docs = await Promise.all(ok.map(f => fb.fs.collection('pres').doc(f.uid).get().catch(() => null)));
     const t = Date.now();
     ok.forEach((f, i) => {
@@ -233,18 +338,24 @@ G.Social = (() => {
     name = (name || '').trim();
     if (!me) return { ok: false, error: 'Primero elige tu apodo.' };
     if (!VALID.test(name)) return { ok: false, error: 'Escribe el apodo exacto de tu amigo.' };
-    const n = await fb.fs.collection('names').doc(name.toLowerCase()).get().catch(() => null);
-    if (!n || !n.exists) return { ok: false, error: 'No hay ningún jugador con ese apodo.' };
-    const other = n.data().uid;
+    const lower = name.toLowerCase();
+    const n = G.CFData && G.CFData.enabled() ? await G.CFData.lookupName(lower).catch(() => null) : await fb.fs.collection('names').doc(lower).get().catch(() => null);
+    if (!n || (!(G.CFData && G.CFData.enabled()) && !n.exists)) return { ok: false, error: 'No hay ningún jugador con ese apodo.' };
+    const other = G.CFData && G.CFData.enabled() ? n.uid : n.data().uid;
     if (other === uid) return { ok: false, error: 'Ese eres tú.' };
     const f = friends.get(other);
     if (f && f.status === 'ok') return { ok: false, error: 'Ya sois amigos.' };
     if (f && f.status === 'out') return { ok: false, error: 'Ya le enviaste una solicitud.' };
     if (f && f.status === 'in') return accept(other);
-    const prof = await fb.fs.collection('profiles').doc(other).get().catch(() => null);
-    const otherName = prof && prof.exists ? prof.data().name : name;
+    const prof = G.CFData && G.CFData.enabled() ? await G.CFData.getProfile(other).catch(() => null) : await fb.fs.collection('profiles').doc(other).get().catch(() => null);
+    const otherName = G.CFData && G.CFData.enabled() ? (prof && prof.name || name) : (prof && prof.exists ? prof.data().name : name);
     const users = [uid, other].sort();
     try {
+      if (G.CFData && G.CFData.enabled()) {
+        await G.CFData.putFriendship({ id: users[0] + '_' + users[1], users, from: uid, to: other, status: 'pending', names: { [uid]: me.name, [other]: otherName }, at: Date.now() });
+        G.Analytics.event('friend_request_sent');
+        return { ok: true, msg: 'Solicitud enviada a ' + otherName };
+      }
       await fb.fs.collection('friendships').doc(users[0] + '_' + users[1]).set({
         users, from: uid, to: other, status: 'pending',
         names: { [uid]: me.name, [other]: otherName },
@@ -259,6 +370,12 @@ G.Social = (() => {
     const f = friends.get(other);
     if (!f || f.status !== 'in') return { ok: false, error: 'No hay solicitud.' };
     try {
+      if (G.CFData && G.CFData.enabled()) {
+        const raw = Object.assign({}, f.raw || {}, { id: f.pid, status: 'ok', names: Object.assign({}, (f.raw && f.raw.names) || {}, { [uid]: me.name }) });
+        await G.CFData.patchFriendship(raw);
+        G.Analytics.event('friend_request_accepted');
+        return { ok: true, msg: 'Ahora eres amigo de ' + f.name };
+      }
       await fb.fs.collection('friendships').doc(f.pid).update({
         status: 'ok', at: firebase.firestore.FieldValue.serverTimestamp(), ['names.' + uid]: me.name
       });
@@ -270,7 +387,11 @@ G.Social = (() => {
   async function remove(other) {
     const f = friends.get(other);
     if (!f) return { ok: false };
-    try { await fb.fs.collection('friendships').doc(f.pid).delete(); return { ok: true }; }
+    try {
+      if (G.CFData && G.CFData.enabled()) await G.CFData.deleteFriendship(f.pid);
+      else await fb.fs.collection('friendships').doc(f.pid).delete();
+      return { ok: true };
+    }
     catch (e) { return { ok: false, error: 'No se pudo borrar (' + (e.code || 'error') + ').' }; }
   }
 
@@ -402,7 +523,8 @@ G.Social = (() => {
     if (room && !room.isHost) return { ok: false, error: 'Sólo el anfitrión de la sala puede invitar.' };
     if (!room) await createRoom();
     try {
-      await fb.fs.collection('inv').doc(other + '_' + uid).set({ to: other, from: uid, room: room.id, name: me.name, at: fts() });
+      if (G.CFData && G.CFData.enabled()) await G.CFData.putInvite({ id: other + '_' + uid, to: other, from: uid, room: room.id, name: me.name, at: Date.now() });
+      else await fb.fs.collection('inv').doc(other + '_' + uid).set({ to: other, from: uid, room: room.id, name: me.name, at: fts() });
     } catch (e) { return { ok: false, error: 'No se pudo invitar (' + (e.code || 'error') + ').' }; }
     sentInv.add(other);
     G.Analytics.event('invite_sent');
@@ -412,13 +534,19 @@ G.Social = (() => {
   /** Retira las invitaciones que mandaste (al salir de la sala). */
   function retractInvites() {
     if (!fb) return;
-    for (const o of sentInv) fb.fs.collection('inv').doc(o + '_' + uid).delete().catch(() => {});
+    for (const o of sentInv) {
+      if (G.CFData && G.CFData.enabled()) G.CFData.deleteInvite(o + '_' + uid).catch(() => {});
+      else fb.fs.collection('inv').doc(o + '_' + uid).delete().catch(() => {});
+    }
     sentInv.clear();
   }
 
   function onInvite(ref, v) {
     // Las caducadas se borran; sólo se aceptan de amigos confirmados.
-    if (!v || (v.at && Date.now() - msOf(v.at) > INVITE_TTL)) { ref.delete().catch(() => {}); return; }
+    if (!v || (v.at && Date.now() - msOf(v.at) > INVITE_TTL)) {
+      if (ref) ref.delete().catch(() => {}); else if (v && v.id && G.CFData) G.CFData.deleteInvite(v.id).catch(() => {});
+      return;
+    }
     const f = friends.get(v.from);
     if (f && f.status !== 'ok') return;
     invites.set(v.from, { from: v.from, name: v.name, room: v.room, at: msOf(v.at) || Date.now() });
@@ -432,7 +560,8 @@ G.Social = (() => {
     const inv = invites.get(from);
     if (!inv || Date.now() - inv.at > INVITE_TTL) { invites.delete(from); emit('invites'); return { ok: false, error: 'La invitación ha caducado.' }; }
     invites.delete(from);
-    invDoc(from).delete().catch(() => {});
+    if (G.CFData && G.CFData.enabled()) G.CFData.deleteInvite(inv.id || (uid + '_' + from)).catch(() => {});
+    else invDoc(from).delete().catch(() => {});
     emit('invites');
     const result = await joinRoom(inv.room);
     if (result.ok) G.Analytics.event('invite_accepted');
@@ -440,8 +569,10 @@ G.Social = (() => {
   }
 
   function declineInvite(from) {
+    const inv = invites.get(from);
     invites.delete(from);
-    invDoc(from).delete().catch(() => {});
+    if (G.CFData && G.CFData.enabled()) G.CFData.deleteInvite((inv && inv.id) || (uid + '_' + from)).catch(() => {});
+    else invDoc(from).delete().catch(() => {});
     G.Analytics.event('invite_declined');
     emit('invites');
   }
@@ -485,9 +616,11 @@ G.Social = (() => {
       if (key === pubLast) return;
       pubLast = key; pubAt = Date.now();
       try { localStorage.setItem(lsKey, key); } catch (e) { /* nada */ }
-      fb.fs.collection('profiles').doc(uid).set(Object.assign(d, {
-        name: me.name, lower: me.name.toLowerCase(), at: firebase.firestore.FieldValue.serverTimestamp()
-      })).catch(e => { pubLast = ''; console.warn('[Social] perfil:', e.code || e.message); });
+      const value = Object.assign(d, { name: me.name, lower: me.name.toLowerCase(), at: Date.now() });
+      const write = G.CFData && G.CFData.enabled()
+        ? G.CFData.putProfile(value)
+        : fb.fs.collection('profiles').doc(uid).set(Object.assign({}, value, { at: firebase.firestore.FieldValue.serverTimestamp() }));
+      write.catch(e => { pubLast = ''; console.warn('[Social] perfil:', e.code || e.message); });
     }, 800);
   }
 
@@ -499,8 +632,9 @@ G.Social = (() => {
     if (other === uid && me) return Object.assign(profileData(), { name: me.name });
     const c = profCache.get(other);
     if (c && Date.now() - c.at < 10 * 60 * 1000) return c.v;     // lo leído vale 10 min
-    const d = await fb.fs.collection('profiles').doc(other).get().catch(() => null);
-    const v = d && d.exists ? d.data() : null;
+    const v = G.CFData && G.CFData.enabled()
+      ? await G.CFData.getProfile(other).catch(() => null)
+      : await fb.fs.collection('profiles').doc(other).get().then(d => d && d.exists ? d.data() : null).catch(() => null);
     profCache.set(other, { at: Date.now(), v });
     return v;
   }

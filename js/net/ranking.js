@@ -131,6 +131,13 @@ G.Ranking = (() => {
     const fb = fbx();
     if (!fb || runMarked === fb.uid) return;
     runMarked = fb.uid;
+    if (G.CFData && G.CFData.enabled()) {
+      G.CFData.putRun({ startedAt: Date.now(), mode }).catch(e => {
+        console.warn('[Ranking] inicio CF:', e.code || e.message);
+        runMarked = '';
+      });
+      return;
+    }
     fb.fs.collection('runs').doc(fb.uid).set({ startedAt: firebase.firestore.FieldValue.serverTimestamp(), mode })
       .catch(e => { runMarked = ''; console.warn('[Ranking] inicio:', e.code || e.message); });
   }
@@ -172,8 +179,12 @@ G.Ranking = (() => {
     const now = Date.now();
     if (!force && championAt && now - championAt < CHAMPION_TTL) return championCache;
     if (championInflight) return championCache;
-    championInflight = sumRef('s_all').get().then(s => {
-      championCache = sorted(s.exists ? s.data().top : {})[0] || null;
+    const legacy = () => sumRef('s_all').get().then(s => s.exists ? s.data().top : {});
+    const read = G.CFData && G.CFData.enabled()
+      ? G.CFData.summary('s_all').then(top => top === null ? legacy() : top)
+      : legacy();
+    championInflight = read.then(top => {
+      championCache = sorted(top || {})[0] || null;
       championAt = Date.now();
       return championCache;
     }).catch(e => {
@@ -202,7 +213,9 @@ G.Ranking = (() => {
       ownedCount: stats.ownedCount, shinyCount: stats.shinyCount,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    collectionWrite = fb.fs.collection('collections').doc(fb.uid).set(data)
+    collectionWrite = (G.CFData && G.CFData.enabled()
+      ? G.CFData.putCollection(Object.assign({}, data, { updatedAt: Date.now() }))
+      : fb.fs.collection('collections').doc(fb.uid).set(data))
       .then(() => {
         collectionWriteAt = Date.now();
         try { localStorage.setItem(collectionSentKey(), String(collectionWriteAt)); } catch (e) { /* nada */ }
@@ -218,6 +231,14 @@ G.Ranking = (() => {
   async function store(boards, id, entry) {
     const fb = fbx();
     const better = [];
+    if (G.CFData && G.CFData.enabled()) {
+      try {
+        const result = await G.CFData.storeRanking(boards.map(([board, period]) => ({ board, period })), id, entry);
+        return result.better || [];
+      } catch (e) {
+        console.warn('[Ranking] CF no pudo guardar; se usa Firebase:', e.code || e.message);
+      }
+    }
     const known = bests();
     await Promise.all(boards.map(async ([b, period]) => {
       const key = b + ':' + id;
@@ -324,8 +345,11 @@ G.Ranking = (() => {
     const c = cacheGet('s:' + b);
     if (c !== undefined) return c;
     if (!inflight.has(b)) {
-      inflight.set(b, sumRef(b).get().then(s => {
-        const top = s.exists ? (s.data().top || {}) : {};
+      const legacy = () => sumRef(b).get().then(s => s.exists ? (s.data().top || {}) : {});
+      const read = G.CFData && G.CFData.enabled()
+        ? G.CFData.summary(b).then(top => top === null ? legacy() : top)
+        : legacy();
+      inflight.set(b, read.then(top => {
         cacheSet('s:' + b, top);
         return top;
       }).finally(() => inflight.delete(b)));
@@ -353,11 +377,21 @@ G.Ranking = (() => {
     if (extra === undefined) {
       if (mode === 's') {
         const missing = circle.filter(u => !inTop.some(r => r.id === u));
-        const docs = await Promise.all(missing.map(u => col(b).doc(u).get().catch(() => null)));
-        extra = docs.filter(d => d && d.exists).map(d => rowOf(d.id, d.data()));
+        if (G.CFData && G.CFData.enabled()) {
+          const rows = await Promise.all(missing.map(u => G.CFData.entry(b, u).catch(() => null)));
+          extra = rows.filter(Boolean).map(d => rowOf(d.id, d.data));
+        } else {
+          const docs = await Promise.all(missing.map(u => col(b).doc(u).get().catch(() => null)));
+          extra = docs.filter(d => d && d.exists).map(d => rowOf(d.id, d.data()));
+        }
       } else {
-        const s = await col(b).where('uids', 'array-contains-any', circle).get();
-        extra = s.docs.map(d => rowOf(d.id, d.data()));
+        if (G.CFData && G.CFData.enabled()) {
+          const rows = await G.CFData.users(b, circle);
+          extra = rows.map(d => rowOf(d.id, d.data));
+        } else {
+          const s = await col(b).where('uids', 'array-contains-any', circle).get();
+          extra = s.docs.map(d => rowOf(d.id, d.data()));
+        }
       }
       cacheSet(ck, extra);
     }
@@ -381,8 +415,16 @@ G.Ranking = (() => {
     } catch (e) { /* nada */ }
     try {
       let docs;
+      const circle = friendsOnly ? [fb.uid, ...G.Social.friends.filter(f => f.status === 'ok').map(f => f.uid)].slice(0, 30) : [];
+      if (G.CFData && G.CFData.enabled()) {
+        const rows = await G.CFData.collectionTop(circle);
+        if (rows.length) {
+          collectionCache = { at: Date.now(), rows, scope };
+          try { localStorage.setItem('ps.rk.collection.top.' + (scope ? 'friends' : 'all'), JSON.stringify(collectionCache)); } catch (e) { /* nada */ }
+          return rows;
+        }
+      }
       if (friendsOnly) {
-        const circle = [fb.uid, ...G.Social.friends.filter(f => f.status === 'ok').map(f => f.uid)].slice(0, 30);
         docs = await Promise.all(circle.map(uid => fb.fs.collection('collections').doc(uid).get().catch(() => null)));
       } else {
         const snap = await fb.fs.collection('collections').orderBy('score', 'desc').limit(TOP).get();
@@ -418,7 +460,15 @@ G.Ranking = (() => {
     const kb = bests(), mk = b + ':' + (mode === 's' ? fb.uid : '*');
     if (kb[mk] === 0) { cacheSet(ck, null); return null; }
     let mine = null;
-    if (mode === 's') {
+    if (G.CFData && G.CFData.enabled()) {
+      if (mode === 's') {
+        const d = await G.CFData.entry(b, fb.uid).catch(() => null);
+        if (d) mine = rowOf(d.id, d.data);
+      } else {
+        const rows = await G.CFData.users(b, [fb.uid]).catch(() => []);
+        for (const d of rows) { const r = rowOf(d.id, d.data); if (!mine || r.t > mine.t) mine = r; }
+      }
+    } else if (mode === 's') {
       const d = await col(b).doc(fb.uid).get();
       if (d.exists) mine = rowOf(d.id, d.data());
     } else {
@@ -440,6 +490,7 @@ G.Ranking = (() => {
    */
   async function countAbove(b, t) {
     const fb = fbx();
+    if (G.CFData && G.CFData.enabled()) return G.CFData.countAbove(b, t);
     const cfg = G.FIREBASE_CONFIG;
     const base = fb.emulator ? 'http://127.0.0.1:8080/v1' : 'https://firestore.googleapis.com/v1';
     const url = `${base}/projects/${cfg.projectId}/databases/(default)/documents/lb/${encodeURIComponent(b)}:runAggregationQuery`;
@@ -463,6 +514,12 @@ G.Ranking = (() => {
   async function removeMine() {
     const fb = fbx();
     if (!fb) return;
+    if (G.CFData && G.CFData.enabled()) {
+      await G.CFData.removeRanking().catch(() => {});
+      try { localStorage.removeItem(bestKey()); } catch (e) { /* nada */ }
+      await G.CFData.deleteCollection().catch(() => {});
+      return;
+    }
     const ids = periodIds();
     const boards = new Set();
     for (const m of ['s', 'g']) for (const [p] of PERIODS) boards.add(m + '_' + ids[p]);

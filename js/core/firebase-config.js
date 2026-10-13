@@ -20,6 +20,10 @@ G.FIREBASE_CONFIG = {
   databaseURL: 'https://pokesurvivor-xyz-default-rtdb.europe-west1.firebasedatabase.app'
 };
 
+// Cloudflare data plane. Authentication remains Firebase for now so existing
+// accounts keep their uid while Firestore data is migrated safely.
+G.FIREBASE_DATA_URL = 'https://api.pokesurvivor.xyz';
+
 /* Ejemplo de cómo debe quedar:
 G.FIREBASE_CONFIG = {
   apiKey: 'AIza...',
