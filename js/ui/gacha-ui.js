@@ -11,6 +11,35 @@ G.GachaUI = (() => {
     en: 'Coming soon · Buy on Waffo',
     'zh-hant': '敬請期待 · 前往 Waffo'
   };
+  const PURCHASE_COPY = {
+    es: { product: '10 tickets de gacha', optional: 'Compra opcional · pago único', paypal: 'Pago único · 9,90 USD', paypalTitle: 'PayPal' },
+    en: { product: '10 Gacha Tickets', optional: 'Optional purchase · one-time payment', paypal: 'One-time payment · USD 9.90', paypalTitle: 'PayPal' },
+    'zh-hant': { product: '10 扭蛋票券', optional: '可選購買 · 一次性付款', paypal: '一次性付款 · 9.90 USD', paypalTitle: 'PayPal' }
+  };
+
+  function purchaseCopy() {
+    return PURCHASE_COPY[G.I18n.lang] || PURCHASE_COPY.es;
+  }
+
+  function updatePurchaseCards() {
+    const copy = purchaseCopy();
+    const icon = G.Icons.html('ticket', 18, 'purchase-ticket-icon');
+    const price = G.I18n.lang === 'es' ? '9,90 USD' : '9.90 USD';
+    const waffo = $('gacha-purchase-card');
+    const paypal = $('paypal-purchase-card');
+    if (waffo) {
+      const title = waffo.querySelector('b');
+      const sub = waffo.querySelector('.sub');
+      if (title) title.innerHTML = `${copy.product} ${icon} · ${price}`;
+      if (sub) sub.textContent = copy.optional;
+    }
+    if (paypal) {
+      const title = paypal.querySelector('b');
+      const sub = paypal.querySelector('.sub');
+      if (title) title.innerHTML = `${copy.paypalTitle} · ${copy.product} ${icon}`;
+      if (sub) sub.textContent = copy.paypal;
+    }
+  }
 
   function init() {
     $('pull-1').onclick = () => pull(1);
@@ -23,6 +52,7 @@ G.GachaUI = (() => {
       purchase.textContent = PURCHASE_LABEL[G.I18n.lang] || PURCHASE_LABEL.es;
       purchase.title = PURCHASE_LABEL[G.I18n.lang] || PURCHASE_LABEL.es;
     }
+    updatePurchaseCards();
     if (G.PayPalUI) G.PayPalUI.init();
 
     const tabs = $('gacha-gens');
@@ -137,5 +167,5 @@ G.GachaUI = (() => {
     refresh();
   }
 
-  return { init, open, refresh, get open_() { return !$('pull-fx').classList.contains('hidden'); } };
+  return { init, open, refresh, purchaseCopy, get open_() { return !$('pull-fx').classList.contains('hidden'); } };
 })();

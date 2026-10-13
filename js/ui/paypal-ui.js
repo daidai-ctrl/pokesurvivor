@@ -5,6 +5,42 @@
 G.PayPalUI = (() => {
   const $ = id => document.getElementById(id);
   let api = '', config = null, sdkPromise = null, mounted = false;
+  const COPY = {
+    es: {
+      login: 'Inicia sesión y sincroniza tu partida antes de pagar.',
+      creating: 'Creando pedido de PayPal…',
+      approving: 'Pago completado; confirmando y entregando los tickets…',
+      success: 'Pago con PayPal realizado: 10 tickets añadidos.',
+      cancel: 'Pago con PayPal cancelado.',
+      error: 'El pago con PayPal ha fallado. Inténtalo de nuevo.',
+      live: 'Pago con PayPal · entorno real',
+      sandbox: 'Entorno de prueba de PayPal'
+    },
+    en: {
+      login: 'Sign in and sync your save before paying.',
+      creating: 'Creating PayPal order…',
+      approving: 'Payment complete; confirming and delivering tickets…',
+      success: 'PayPal payment complete: 10 tickets added.',
+      cancel: 'PayPal payment canceled.',
+      error: 'PayPal payment failed. Please try again.',
+      live: 'PayPal payment · live environment',
+      sandbox: 'PayPal sandbox environment'
+    },
+    'zh-hant': {
+      login: '請先登入並完成存檔同步，再進行付款。',
+      creating: '正在建立 PayPal 訂單…',
+      approving: '付款完成，正在確認並發放票券…',
+      success: 'PayPal 付款成功，已增加 10 張票券。',
+      cancel: '已取消 PayPal 付款。',
+      error: 'PayPal 付款失敗，請稍後再試。',
+      live: 'PayPal 正式付款',
+      sandbox: 'PayPal 測試環境'
+    }
+  };
+
+  function copy() {
+    return COPY[G.I18n && G.I18n.lang] || COPY.es;
+  }
 
   function apiUrl() {
     return String(G.PAYPAL_API_URL || '').replace(/\/$/, '');
@@ -33,7 +69,7 @@ G.PayPalUI = (() => {
 
   async function request(path, options = {}) {
     const cu = G.DB && G.DB.fb && G.DB.fb.auth && G.DB.fb.auth.currentUser;
-    if (!cu) throw new Error('请先登录账号');
+    if (!cu) throw new Error(copy().login);
     const token = await cu.getIdToken();
     const headers = Object.assign({ Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, options.headers || {});
     const r = await fetch(api + path, Object.assign({}, options, { headers }));
@@ -79,24 +115,24 @@ G.PayPalUI = (() => {
       createOrder: async () => {
         if (!G.DB.online || G.DB.syncState !== 'ok') {
           await G.DB.flush();
-          if (!G.DB.online || G.DB.syncState !== 'ok') throw new Error('请先登录并完成存档同步');
+          if (!G.DB.online || G.DB.syncState !== 'ok') throw new Error(copy().login);
         }
-        status('正在创建 PayPal 订单…');
+        status(copy().creating);
         const requestId = 'ps-' + crypto.randomUUID();
         const result = await request('/v1/orders', { method: 'POST', headers: { 'Idempotency-Key': requestId }, body: JSON.stringify({ product: 'tickets10' }) });
         return result.orderId;
       },
       onApprove: async data => {
         try {
-          status('付款完成，正在确认并发放票券…');
+          status(copy().approving);
           const result = await request('/v1/orders/' + encodeURIComponent(data.orderID) + '/capture', { method: 'POST', body: '{}' });
           await syncAndClaim(result.grantId);
-          status('PayPal 支付成功，已到账 10 张票券。');
+          status(copy().success);
           if (G.GachaUI && G.GachaUI.refresh) G.GachaUI.refresh();
         } catch (e) { status(e.message || '付款已完成，但票券正在等待同步，请稍后重试。', true); }
       },
-      onCancel: () => status('已取消 PayPal 付款。'),
-      onError: e => { console.error('[PayPal]', e); status('PayPal 付款失败，请稍后再试。', true); }
+      onCancel: () => status(copy().cancel),
+      onError: e => { console.error('[PayPal]', e); status(copy().error, true); }
     }).render('#paypal-buttons');
   }
 
@@ -107,7 +143,7 @@ G.PayPalUI = (() => {
       config = await publicConfig();
       if (!config || !config.enabled || !['sandbox', 'live'].includes(config.environment)) return;
       card.hidden = false;
-      status(config.environment === 'live' ? 'PayPal 正式支付' : 'Sandbox 测试环境');
+      status(config.environment === 'live' ? copy().live : copy().sandbox);
       await mount();
       setTimeout(claimPending, 2500);
     } catch (e) {
