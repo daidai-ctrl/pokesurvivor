@@ -103,7 +103,7 @@ G.SettingsUI = (() => {
       renderAccount(box);
     } else {
       box.innerHTML = `<div class="about-logo">PokéSurvivor</div><p class="sub center">Versión ${esc(VERSION)}</p>`
-        + `<p class="sub">Juego de fans <b>gratuito y sin ánimo de lucro</b>: sin anuncios ni compras. Pokémon y sus personajes son propiedad de Nintendo, Creatures y GAME FREAK; este proyecto no está afiliado a ellos.</p>`
+        + `<p class="sub">Juego de fans <b>gratuito y sin ánimo de lucro</b>: el acceso básico es gratuito y existe una compra digital opcional de 10 tickets por 9,90 USD, en un único pago. Pokémon y sus personajes son propiedad de Nintendo, Creatures y GAME FREAK; este proyecto no está afiliado a ellos.</p>`
         + section('Créditos')
         + `<ul class="credits">
              <li><b>Sprites:</b> PMD SpriteCollab y sus artistas (CC BY-NC 4.0).</li>
@@ -114,6 +114,7 @@ G.SettingsUI = (() => {
         + `<div class="row wrap" style="justify-content:center;gap:8px">
              ${window.PS_PAGES ? `<a class="btn small" href="${G.I18n.lang === 'en' ? 'en/guide/' : G.I18n.lang === 'zh-hant' ? 'zh-hant/guide/' : 'guia/'}" target="_blank">Guía y preguntas</a>
              <a class="btn small" href="${G.I18n.lang === 'en' || G.I18n.lang === 'zh-hant' ? 'en/pokedex/' : 'pokedex/'}" target="_blank">Pokédex</a>` : ''}
+             <a class="btn small" href="${G.I18n.lang === 'en' ? 'en/purchases/' : G.I18n.lang === 'zh-hant' ? 'zh-hant/purchases/' : 'compras/'}" target="_blank">Compras y precios</a>
              <button class="btn small" data-legal>Aviso legal y privacidad</button>
              <a class="btn small" href="contacto/" target="_blank" rel="noopener">Contacto</a>
              <a class="btn small" href="${REPO}" target="_blank" rel="noopener">Código (GitHub)</a>

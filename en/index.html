@@ -130,7 +130,7 @@
       <button id="btn-guest" class="btn ghost grow" type="button">Jugar como invitado</button>
     </div>
     <p class="note center" id="login-mode"></p>
-    <p class="note center"><a href="/en/guide/">Guide</a> · <a href="/en/pokedex/">Pokédex</a> · <a href="#" class="legal-link" data-legal>Legal notice and privacy</a> · <a href="/en/purchases/">Purchases and pricing</a> · <a href="/en/terms/">Terms</a> · <a href="/en/privacy/">Privacy</a></p>
+    <p class="note center"><a href="/en/guide/">Guía</a> · <a href="/en/pokedex/">Pokédex</a> · <a href="#" class="legal-link" data-legal>Aviso legal y privacidad</a> · <a href="compras/">Compras y precios</a> · <a href="terms/">Términos</a> · <a href="privacy/">Privacidad</a></p>
     <!-- home-seo:begin -->
     <details class="home-seo">
       <summary>Learn about PokéSurvivor</summary>
@@ -156,7 +156,7 @@
     </details>
     <!-- home-seo:end -->
     <footer class="site-footer" style="margin-top:14px;padding-top:10px;border-top:1px solid rgba(255,255,255,.16);text-align:center">
-      <p class="note center"><a href="/en/purchases/">Purchases and pricing</a> · <a href="/en/terms/">Terms</a> · <a href="/en/privacy/">Privacy</a> · <a href="/contacto/">Contact</a></p>
+      <p class="note center"><a href="compras/">Compras y precios</a> · <a href="terms/">Términos</a> · <a href="privacy/">Privacidad</a> · <a href="contacto/">Contacto</a></p>
     </footer>
   </div>
 </section>
@@ -202,6 +202,16 @@
 
 <!-- ====== Menú principal ====== -->
 <section id="scr-menu" class="scr hidden">
+  <div class="menu-champion hidden" id="menu-champion" aria-live="polite">
+    <div class="champion-laurel laurel-left" aria-hidden="true"></div>
+    <div class="champion-emblem" id="menu-champion-icon"></div>
+    <div class="champion-copy">
+      <div class="champion-title" id="menu-champion-title"></div>
+      <div class="champion-name" id="menu-champion-name"></div>
+      <div class="champion-sub" id="menu-champion-sub"></div>
+    </div>
+    <div class="champion-laurel laurel-right" aria-hidden="true"></div>
+  </div>
   <div class="menu-left">
     <div class="logo">
       <div class="t1">PokéSurvivor</div>
@@ -284,7 +294,7 @@
     <div class="row between"><h2>Aviso legal</h2><button class="btn small ghost" id="legal-close">Cerrar</button></div>
     <h3>Proyecto de fan</h3>
     <p><b>PokéSurvivor</b> es un juego hecho por fans, <b>gratuito y sin ánimo de lucro</b>.
-      No tiene anuncios ni compras. Se puede apoyar con donaciones voluntarias, que se usan sólo para pagar los servidores y el dominio, y que no dan ninguna ventaja en el juego.</p>
+      El acceso básico es gratuito y existe una compra digital opcional de 10 tickets por 9,90 USD, en un único pago. Las compras no garantizan un personaje concreto y no son necesarias para jugar.</p>
     <p>No está afiliado, patrocinado ni aprobado por Nintendo, Creatures Inc., GAME FREAK ni
       The Pokémon Company. Pokémon y todos los nombres y personajes relacionados son marcas y
       propiedad de sus respectivos dueños.</p>
@@ -304,7 +314,7 @@
       mejoras y estadísticas) en Google Firebase para que puedas seguir en cualquier ordenador.
       Si entras con Google, Firebase guarda también tu correo de Google para identificarte
       (nunca se enseña a otros jugadores).
-      No usamos tus datos para nada más, ni los compartimos, ni hay publicidad ni seguimiento.
+      No usamos tus datos para nada más ni los compartimos.
       Como invitado no se guarda nada fuera de tu navegador.</p>
     <p>Amigos y ranking: tu <b>apodo</b> es público para otros jugadores. Guardamos tu lista de
       amigos, si estás en línea y tus mejores tiempos (con tu apodo y tu Pokémon).</p>
@@ -398,7 +408,7 @@
 <!-- ====== Ranking ====== -->
 <section id="scr-rank" class="scr dim hidden">
   <div class="box wide">
-    <div class="row between"><h2>Ranking <span class="sub" style="font-size:15px">· tiempo aguantado</span></h2><button class="btn small ghost" data-back>Volver</button></div>
+    <div class="row between"><h2 id="rk-title">Ranking <span class="sub" style="font-size:15px">· tiempo aguantado</span></h2><button class="btn small ghost" data-back>Volver</button></div>
     <div class="gen-tabs" id="rk-mode"></div>
     <div class="filters" id="rk-period"></div>
     <div class="row rk-tools">
@@ -407,6 +417,7 @@
       <datalist id="rk-dl"></datalist>
       <button id="rk-clear" class="btn small ghost hidden">Quitar filtro</button>
     </div>
+    <div id="rk-collection-info" class="rk-collection-info hidden"></div>
     <div id="rk-list" class="rk-list"></div>
     <div id="rk-me" class="rk-me"></div>
   </div>
@@ -495,6 +506,11 @@
         </div>
         <p class="note tickets-line" id="gacha-tickets"></p>
         <p class="note" id="gacha-pity"></p>
+        <div class="panel purchase-card" id="gacha-purchase-card">
+          <b>10 Gacha Tickets · 9,90 USD</b>
+          <span class="sub">Compra opcional · pago único</span>
+          <a id="gacha-purchase" class="btn small gold" href="compras/" target="_blank" rel="noopener">Ver compras y precios</a>
+        </div>
       </div>
       <div class="panel rates" id="gacha-rates"></div>
     </div>
@@ -560,6 +576,6 @@
 </section>
 
 <!-- datos generados -->
-<script defer src="js/app.min.js?v=c74cb72356"></script>
+<script defer src="js/app.min.js?v=9f318c3c90"></script>
 </body>
 </html>

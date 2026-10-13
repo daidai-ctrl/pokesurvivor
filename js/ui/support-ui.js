@@ -1,7 +1,8 @@
 /* ============ support-ui.js — "Apoyar el proyecto" ============
  * Botón con un corazón en la barra del menú (sólo si hay cuenta de Ko-fi en
  * js/data/funding.js) y una ventana que explica, con números, a qué va el
- * dinero. No se cobra nada dentro del juego: el pago es en Ko-fi.
+ * dinero. Las donaciones se procesan en Ko-fi; las compras digitales se
+ * explican en la página de compras.
  */
 G.SupportUI = (() => {
   const $ = G.UI.$;
@@ -23,7 +24,7 @@ G.SupportUI = (() => {
     G.Analytics.event('support_opened');
     const rows = F.costs.map(([c, v]) => `<tr><td>${c}</td><td class="num">${val(v)}</td></tr>`).join('');
     $('sup-body').innerHTML = `
-      <p>PokéSurvivor es y será <b>gratis</b>, sin anuncios ni compras. Si quieres ayudar a que siga en línea, puedes hacer una
+      <p>PokéSurvivor ofrece un acceso básico <b>gratuito</b>. También existe una compra digital opcional de 10 tickets por 9,90 USD, en un único pago. Si quieres ayudar a que siga en línea, puedes hacer una
       <b>donación voluntaria</b>: todo el dinero se usa para los <b>servidores y el dominio</b>, nada más.</p>
       <p class="sub">Donar no da ninguna ventaja en el juego.</p>
       <h3>Lo que cuesta mantenerlo</h3>

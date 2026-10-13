@@ -11,6 +11,10 @@ G.GachaUI = (() => {
     $('pull-10').onclick = () => pull(10, 't1');
     $('pull-10b').onclick = () => pull(10, 't10');
     $('pull-close').onclick = close;
+    const purchase = $('gacha-purchase');
+    if (purchase) {
+      purchase.href = G.I18n.lang === 'en' ? '/en/purchases/' : G.I18n.lang === 'zh-hant' ? '/zh-hant/purchases/' : '/compras/';
+    }
 
     const tabs = $('gacha-gens');
     G.Gacha.BANNERS.forEach(b => {

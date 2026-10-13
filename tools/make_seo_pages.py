@@ -82,17 +82,23 @@ def page(pid, lang, title, desc, body, ld=None):
     alts += f'<link rel="alternate" hreflang="x-default" href="{SITE}{PATH["es"][pid]}">\n'
     nav = ''.join(f'<a href="{rel(me, PATH[lang][p])}">{esc(t)}</a>' for p, t in NAV[lang])
     foot = ' · '.join(f'<a href="{rel(me, PATH[lang][p])}">{esc(t)}</a>' for p, t in FOOT[lang])
+    legal_nav = {
+        'es': [('compras/', 'Compras y precios'), ('terms/', 'Términos'), ('privacy/', 'Privacidad'), ('contacto/', 'Contacto')],
+        'en': [('en/purchases/', 'Purchases and pricing'), ('en/terms/', 'Terms'), ('en/privacy/', 'Privacy'), ('contacto/', 'Contact')],
+        'zh-hant': [('zh-hant/purchases/', '購買與價格'), ('zh-hant/terms/', '服務條款'), ('zh-hant/privacy/', '隱私權'), ('contacto/', '聯絡方式')],
+    }[lang]
+    legal_foot = ' · '.join(f'<a href="{rel(me, href)}">{esc(label)}</a>' for href, label in legal_nav)
     play = {'es': 'Jugar gratis', 'en': 'Play free', 'zh-hant': '免費遊玩'}[lang]
     switch = ' · '.join(f'<a class="lang" hreflang="{LOCALE[l]}" href="{rel(me, PATH[l][pid])}">{LANG_LABEL[l]}</a>' for l in langs_for(pid) if l != lang)
-    legal = ('PokéSurvivor es un juego de fans <b>gratuito y sin ánimo de lucro</b>, sin anuncios ni compras (sólo donaciones voluntarias para los servidores). No está afiliado a Nintendo, Creatures, '
+    legal = ('PokéSurvivor es un juego de fans <b>gratuito y sin ánimo de lucro</b>. El acceso básico es gratuito y existe una compra digital opcional de 10 tickets por 9,90 USD, en un único pago. Las compras no garantizan un personaje concreto. No está afiliado a Nintendo, Creatures, '
              'GAME FREAK ni The Pokémon Company; Pokémon y sus personajes son propiedad de sus respectivos dueños. Sprites de PMD SpriteCollab '
              '(CC BY-NC 4.0) · datos de PokéAPI · música y sonidos originales. No tiene ninguna criptomoneda ni token oficial: '
              'cualquiera que use su nombre es de terceros y no nos hacemos cargo de compras ni inversiones.') if lang == 'es' else (
-             'PokéSurvivor is a <b>free, non-profit</b> fan game with no ads or purchases (only voluntary donations for the servers). It is not affiliated with Nintendo, Creatures, GAME FREAK '
+             'PokéSurvivor is a <b>free, non-profit</b> fan game. Basic access is free, and an optional digital pack of 10 tickets costs USD 9.90 as a one-time payment. Purchases do not guarantee a particular character. It is not affiliated with Nintendo, Creatures, GAME FREAK '
              'or The Pokémon Company; Pokémon and its characters are owned by their respective owners. Sprites from PMD SpriteCollab (CC BY-NC 4.0) '
              '· data from PokéAPI · original music and sounds. It has no official cryptocurrency or token: any using its name '
              'belongs to third parties and we take no responsibility for purchases or investments.') if lang == 'en' else (
-             'PokéSurvivor 是一款<b>免費且非營利</b>的粉絲遊戲，不含廣告或付費內容（自願捐款僅用於伺服器）。本作與 Nintendo、Creatures、GAME FREAK 或 The Pokémon Company 無關；Pokémon 與相關角色歸其各自權利人所有。素材來自 PMD SpriteCollab（CC BY-NC 4.0），資料來自 PokéAPI，音樂與音效為原創。' if lang == 'zh-hant' else '')
+             'PokéSurvivor 是一款<b>免費且非營利</b>的粉絲遊戲。基本遊玩免費，另有可選購的 10 張抽獎券數位商品，價格為 9.90 美元，一次性付款。購買不保證取得特定角色。本作與 Nintendo、Creatures、GAME FREAK 或 The Pokémon Company 無關；Pokémon 與相關角色歸其各自權利人所有。素材來自 PMD SpriteCollab（CC BY-NC 4.0），資料來自 PokéAPI，音樂與音效為原創。' if lang == 'zh-hant' else '')
     ldj = ('<script type="application/ld+json">\n' + json.dumps(ld, ensure_ascii=False) + '\n</script>') if ld else ''
     return f'''<!doctype html>
 <html lang="{LOCALE[lang]}">
@@ -137,6 +143,7 @@ def page(pid, lang, title, desc, body, ld=None):
 </main>
 <footer>
   <p>{foot}</p>
+  <p>{legal_foot}</p>
   <p>{legal}</p>
   <p><a href="https://github.com/JPTER78/pokesurvivor">GitHub</a></p>
 </footer>
@@ -299,24 +306,24 @@ def guide_zh_hant():
 # ================= guía =================
 FAQ = {
  'es': [
-  ('¿PokéSurvivor es gratis?', 'Sí, totalmente. Es un juego de fans sin ánimo de lucro: no tiene anuncios ni compras. Si quieres, puedes apoyarlo con una donación voluntaria, que se usa sólo para los servidores y no da ventajas.'),
+  ('¿PokéSurvivor es gratis?', 'Sí. El acceso básico es gratuito y existe una compra digital opcional de 10 tickets por 9,90 USD, en un único pago. Consulta la página de compras para ver los detalles. Si quieres, puedes apoyarlo con una donación voluntaria.'),
   ('¿Hay que descargar algo?', 'No. Se juega en el navegador, en PC, tablet o móvil. Si quieres, puedes instalarlo como app con «Añadir a pantalla de inicio».'),
   ('¿Se puede jugar en el móvil?', 'Sí, en horizontal. Pon el dedo en cualquier parte de la pantalla y arrastra para moverte (el joystick aparece donde tocas), toca un ataque para cambiarlo y el botón de arriba a la derecha para pausar.'),
   ('¿Está en inglés?', 'Sí: el juego sale en español o en inglés según el idioma de tu navegador, y se puede cambiar en Ajustes.'),
   ('¿Puedo jugar con mis amigos?', 'Sí: el modo cooperativo online admite hasta 4 jugadores. Añade a tus amigos por su apodo, invítalos a tu sala y empezad la partida. La experiencia se comparte y podéis revivir a un compañero caído quedándoos a su lado.'),
   ('¿Cuántos Pokémon hay?', f'{N} Pokémon de las 9 regiones (de Kanto a Paldea), todos jugables como compañero y con su versión shiny cuando existe.'),
-  ('¿Cómo consigo más Pokémon?', 'Con el gacha, que funciona con tickets que se ganan jugando: los Pokémon normales sueltan tickets de vez en cuando, y los jefes y los legendarios de las grietas, a veces, tickets ×10. No se pueden comprar con dinero real.'),
+  ('¿Cómo consigo más Pokémon?', 'Con el gacha, que funciona con tickets que se ganan jugando: los Pokémon normales sueltan tickets de vez en cuando, y los jefes y los legendarios de las grietas, a veces, tickets ×10. También puedes comprar opcionalmente un paquete de 10 tickets por 9,90 USD en la página de compras.'),
   ('¿Qué son las grietas?', 'Portales misteriosos que aparecen muy de vez en cuando. Si entras, luchas contra un Pokémon legendario en una arena de su tipo (hay 18 distintas). Si ganas, te llevas premio; si caes, vuelves al mapa.'),
   ('¿Se guarda mi progreso?', 'Con una cuenta (nombre y contraseña o Google) tu partida se guarda en la nube y la puedes seguir en cualquier dispositivo. Como invitado se juega al momento, pero no se guarda.'),
   ('¿Es un juego oficial de Pokémon?', 'No. Es un proyecto hecho por fans, gratuito y sin ánimo de lucro, sin relación con Nintendo, GAME FREAK ni The Pokémon Company.')],
  'en': [
-  ('Is PokéSurvivor free?', 'Yes, completely. It\'s a non-profit fan game with no ads or purchases. If you like, you can support it with a voluntary donation, which only pays for the servers and gives no advantages.'),
+  ('Is PokéSurvivor free?', 'Yes. Basic access is free, and an optional digital pack of 10 tickets costs USD 9.90 as a one-time payment. See the purchases page for details. You can also support it with a voluntary donation.'),
   ('Do I need to download anything?', 'No. You play in your browser on PC, tablet or phone. If you like, you can install it as an app with “Add to Home Screen”.'),
   ('Can I play on my phone?', 'Yes, in landscape. Put your finger anywhere on the screen and drag to move (the joystick appears where you touch), tap a move to switch to it and the top-right button to pause.'),
   ('Is it in English?', 'Yes: the game shows up in English or Spanish depending on your browser language, and you can change it in Settings.'),
   ('Can I play with my friends?', 'Yes: online co-op supports up to 4 players. Add your friends by nickname, invite them to your room and start the game. Experience is shared and you can revive a fallen teammate by standing next to them.'),
   ('How many Pokémon are there?', f'{N} Pokémon from all 9 regions (Kanto to Paldea), all playable as your partner, with their shiny form when one exists.'),
-  ('How do I get more Pokémon?', 'From the gacha, which uses tickets you earn by playing: regular Pokémon drop tickets now and then, and bosses and rift legendaries sometimes drop ×10 tickets. They can\'t be bought with real money.'),
+  ('How do I get more Pokémon?', 'From the gacha, which uses tickets you earn by playing: regular Pokémon drop tickets now and then, and bosses and rift legendaries sometimes drop ×10 tickets. You can also optionally buy a 10-ticket pack for USD 9.90 on the purchases page.'),
   ('What are rifts?', 'Mysterious portals that open very rarely. If you go in, you fight a legendary Pokémon in an arena of its type (there are 18). Win and you get a reward; fall and you\'re sent back to the map.'),
   ('Is my progress saved?', 'With an account (name and password, or Google) your game is saved in the cloud and you can continue on any device. Guests can play right away, but nothing is saved.'),
   ('Is this an official Pokémon game?', 'No. It\'s a free, non-profit fan project, unrelated to Nintendo, GAME FREAK or The Pokémon Company.')]}
@@ -665,7 +672,7 @@ def support(lang):
         btns = ''.join(x for x in [f'<a class="btn" href="{kofi}" rel="noopener">Donar en Ko-fi</a>' if kofi else '',
                                    f'<a class="btn ghost" href="{spons}" rel="noopener">GitHub Sponsors</a>' if spons else ''])
         body = f"""<article class="doc"><h1>{h1}</h1>
-<p class="lead">PokéSurvivor es y será <b>gratis</b>: sin anuncios, sin compras y sin ventajas de pago. Si te gusta y quieres ayudar a que siga en línea,
+<p class="lead">PokéSurvivor ofrece un acceso básico <b>gratuito</b>. También existe una compra digital opcional de 10 tickets por 9,90 USD, en un único pago, sin ventajas de pago. Si te gusta y quieres ayudar a que siga en línea,
 puedes hacer una <b>donación voluntaria</b>. <b>Todo el dinero se usa para los servidores y el dominio</b>; lo que sobre se guarda para los meses siguientes.</p>
 <p>Donar no da ninguna ventaja dentro del juego: todos los jugadores juegan igual.</p>
 <h2>Qué cuesta mantenerlo</h2>
@@ -675,13 +682,13 @@ puedes hacer una <b>donación voluntaria</b>. <b>Todo el dinero se usa para los 
 <p>{btns or 'Muy pronto podrás donar desde aquí.'}</p>
 <p>También ayuda mucho, y gratis: compartir el juego con tus amigos, recomendarlo y avisar de fallos.</p>
 {cta(pid, lang, 'Volver al juego')}</article>"""
-        title, desc = 'Apoyar PokéSurvivor: donaciones para los servidores', 'PokéSurvivor es gratis y sin anuncios. Las donaciones voluntarias se usan sólo para los servidores y el dominio.'
+        title, desc = 'Apoyar PokéSurvivor: donaciones para los servidores', 'El acceso básico de PokéSurvivor es gratuito; las compras digitales y las donaciones son opcionales.'
     else:
         h1 = 'Support PokéSurvivor'
         btns = ''.join(x for x in [f'<a class="btn" href="{kofi}" rel="noopener">Donate on Ko-fi</a>' if kofi else '',
                                    f'<a class="btn ghost" href="{spons}" rel="noopener">GitHub Sponsors</a>' if spons else ''])
         body = f"""<article class="doc"><h1>{h1}</h1>
-<p class="lead">PokéSurvivor is and will stay <b>free</b>: no ads, no purchases and no pay-to-win. If you enjoy it and want to help keep it online,
+<p class="lead">PokéSurvivor offers <b>free basic access</b>. An optional digital pack of 10 tickets costs USD 9.90 as a one-time payment, with no pay-to-win. If you enjoy it and want to help keep it online,
 you can make a <b>voluntary donation</b>. <b>All the money goes to the servers and the domain</b>; anything left over is saved for the following months.</p>
 <p>Donating gives no advantage in the game: everyone plays on equal terms.</p>
 <h2>What it costs to run</h2>
@@ -691,7 +698,7 @@ you can make a <b>voluntary donation</b>. <b>All the money goes to the servers a
 <p>{btns or 'You\'ll be able to donate from here very soon.'}</p>
 <p>Sharing the game with your friends, recommending it and reporting bugs helps a lot too, and it\'s free.</p>
 {cta(pid, lang, 'Back to the game')}</article>"""
-        title, desc = 'Support PokéSurvivor: donations for the servers', 'PokéSurvivor is free and ad-free. Voluntary donations only pay for the servers and the domain.'
+        title, desc = 'Support PokéSurvivor: donations for the servers', 'PokéSurvivor offers free basic access; digital purchases and donations are optional.'
     write(pid, lang, page(pid, lang, title, desc, body, {'@context': 'https://schema.org', '@graph': [crumbs(pid, lang, h1)]}))
 
 # ================= juegos localizados =================
@@ -837,7 +844,8 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
 <body><header class="top"><a class="brand" href="/">PokéSurvivor</a><nav><a href="/guia/">Guía</a><a href="/en/">English</a><a class="play" href="/">Jugar gratis</a></nav></header>
 <main><article class="doc center"><h1>404 · Te has perdido en la mazmorra</h1><p class="lead">Esta página no existe. Pero las hordas siguen esperando…</p>
 <p class="lead" lang="en">This page doesn't exist. But the hordes are still waiting…</p>
-<p class="cta"><a class="btn" href="/">Volver al juego</a> <a class="btn ghost" href="/en/">Play in English</a></p></article></main></body></html>
+<p class="cta"><a class="btn" href="/">Volver al juego</a> <a class="btn ghost" href="/en/">Play in English</a></p></article></main>
+<footer><p><a href="/compras/">Compras y precios</a> · <a href="/terms/">Términos</a> · <a href="/privacy/">Privacidad</a> · <a href="/contacto/">Contacto</a></p></footer></body></html>
 '''
     open(os.path.join(ROOT, '404.html'), 'w', encoding='utf-8').write(nf)
     open(os.path.join(ROOT, 'robots.txt'), 'w', encoding='utf-8').write(f'# PokéSurvivor\nUser-agent: *\nAllow: /\nDisallow: /tools/\nDisallow: /docs/\nDisallow: /dev.html\n\nSitemap: {SITE}sitemap.xml\n')
@@ -861,6 +869,31 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   </url>
 '''
             )
+    # Static commercial/legal pages are maintained outside the SEO generator,
+    # but they still belong in the sitemap so reviewers and crawlers can find
+    # pricing, terms and privacy from the same canonical entry points.
+    static_urls = [
+        ('compras/', 'monthly', '0.6', [('es', 'compras/'), ('en', 'en/purchases/'), ('zh-Hant', 'zh-hant/purchases/')]),
+        ('en/purchases/', 'monthly', '0.6', [('es', 'compras/'), ('en', 'en/purchases/'), ('zh-Hant', 'zh-hant/purchases/')]),
+        ('zh-hant/purchases/', 'monthly', '0.6', [('es', 'compras/'), ('en', 'en/purchases/'), ('zh-Hant', 'zh-hant/purchases/')]),
+        ('terms/', 'yearly', '0.4', []),
+        ('privacy/', 'yearly', '0.4', []),
+        ('en/terms/', 'yearly', '0.4', []),
+        ('en/privacy/', 'yearly', '0.4', []),
+        ('zh-hant/terms/', 'yearly', '0.4', []),
+        ('zh-hant/privacy/', 'yearly', '0.4', []),
+    ]
+    for path, freq, priority, alternates in static_urls:
+        alt = ''.join(f'    <xhtml:link rel="alternate" hreflang="{lang}" href="{SITE}{href}" />\n' for lang, href in alternates)
+        if alternates:
+            alt += f'    <xhtml:link rel="alternate" hreflang="x-default" href="{SITE}{alternates[0][1]}" />\n'
+        urls.append(f'''  <url>
+    <loc>{SITE}{path}</loc>
+    <lastmod>{TODAY}T00:00:00.000Z</lastmod>
+    <changefreq>{freq}</changefreq>
+    <priority>{priority}</priority>
+{alt}  </url>
+''')
     open(os.path.join(ROOT, 'sitemap.xml'), 'w', encoding='utf-8').write(
         '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' + ''.join(urls) + '</urlset>\n')
 

@@ -49,7 +49,7 @@ Google sube las webs que otras webs enlazan y que la gente busca por su nombre:
   título "PokéSurvivor – Juego Pokémon gratis en el navegador".
 - **itch.io**: crea una página del juego (gratis, en la categoría HTML5) con enlace.
 - **Reddit**: r/PokemonROMhacks, r/incremental_games, r/WebGames, r/survivorslikes
-  (lee sus normas; a muchos les gustan los fan games gratuitos sin anuncios).
+  (lee sus normas; a muchos les gustan los fan games gratuitos con una propuesta clara y transparente).
 - **Discord**: servidores de fan games de Pokémon y de "survivors-like".
 - **TikTok / Shorts** con clips de 15 s (shinies, legendarios, cooperativo).
 - Pide a quien lo juegue que lo enlace o lo comparta: cada enlace cuenta.
