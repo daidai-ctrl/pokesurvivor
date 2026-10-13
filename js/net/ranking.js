@@ -20,7 +20,7 @@
  *                      { uid, name, score, ownedCount, shinyCount, updatedAt }
  *
  * Ahorros:
- *   - Lo leído se guarda 30 min en el navegador (cambiar de pestaña y volver: 0).
+ *   - Lo leído se guarda un día en el navegador (cambiar de pestaña y volver: 0).
  *   - Tus mejores marcas se recuerdan en el navegador: al acabar una partida
  *     no hay que leer nada para saber si has mejorado, y sólo se escribe
  *     donde mejoras.
@@ -41,12 +41,13 @@ G.Ranking = (() => {
   const TOP_ONLY = new Set(['d', 'w', 'm', 'p']);
   const TOP = 50;
   const COLLECTION_POINTS = { 1: 1, 2: 3, 3: 6, 4: 12, 5: 25 };
-  const COLLECTION_PUSH_GAP = 30 * 1000;
-  const CHAMPION_TTL = 5 * 60 * 1000;
+  const DAILY = 24 * 60 * 60 * 1000;
+  const COLLECTION_PUSH_GAP = DAILY;
+  const CHAMPION_TTL = DAILY;
   // Las runs de menos de 1 minuto no se suben (casi nunca entran en una tabla
   // y eran muchas lecturas y escrituras para nada).
   const MIN_T = 60;
-  const TTL = 30 * 60 * 1000;            // caché de lo leído (30 min: menos lecturas de Firestore)
+  const TTL = DAILY;                      // caché de lo leído (1 día: menos lecturas de Firestore)
 
   const fbx = () => G.DB.online ? G.DB.fb : null;
 
@@ -142,6 +143,15 @@ G.Ranking = (() => {
   let championCache = null, championAt = 0, championInflight = null;
   let collectionWriteAt = 0, collectionWrite = null, collectionCache = null;
 
+  // Se recuerda entre sesiones: una recarga o cerrar el juego no provoca otra
+  // escritura de la colección el mismo día.
+  const collectionSentKey = () => 'ps.rk.collection.sent.' + (fbx() ? fbx().uid : '');
+  function lastCollectionWrite() {
+    if (collectionWriteAt) return collectionWriteAt;
+    try { collectionWriteAt = +(localStorage.getItem(collectionSentKey()) || 0); } catch (e) { /* nada */ }
+    return collectionWriteAt;
+  }
+
   /** Calcula la puntuación desde la colección real del jugador. Los repetidos no suman. */
   function collectionStats(save = G.DB.save) {
     const owned = save && save.owned || {}, shiny = save && save.shiny || {};
@@ -185,7 +195,7 @@ G.Ranking = (() => {
     if (!fb || !G.Social.me || !G.DB.save) return collectionStats(G.DB.save);
     const now = Date.now();
     const stats = collectionStats(G.DB.save);
-    if (!force && now - collectionWriteAt < COLLECTION_PUSH_GAP) return stats;
+    if (!force && now - lastCollectionWrite() < COLLECTION_PUSH_GAP) return stats;
     if (collectionWrite) return collectionWrite;
     const data = {
       uid: fb.uid, name: G.Social.me.name, score: stats.score,
@@ -193,7 +203,12 @@ G.Ranking = (() => {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     collectionWrite = fb.fs.collection('collections').doc(fb.uid).set(data)
-      .then(() => { collectionWriteAt = Date.now(); collectionCache = null; return stats; })
+      .then(() => {
+        collectionWriteAt = Date.now();
+        try { localStorage.setItem(collectionSentKey(), String(collectionWriteAt)); } catch (e) { /* nada */ }
+        collectionCache = null;
+        return stats;
+      })
       .catch(e => { console.warn('[Ranking] colección:', e.code || e.message); return stats; })
       .finally(() => { collectionWrite = null; });
     return collectionWrite;
@@ -211,7 +226,7 @@ G.Ranking = (() => {
         if (known[key] === undefined) {
           if (TOP_ONLY.has(period)) {
             // En estas tablas sólo hay marcas en el top 50: basta con el resumen
-            // (que además se guarda 30 min y es el mismo que se lee al mirar el ranking).
+            // (que además se guarda un día y es el mismo que se lee al mirar el ranking).
             const top = await summary(b);
             known[key] = top[id] ? top[id].t : 0;
           } else {
@@ -281,7 +296,6 @@ G.Ranking = (() => {
     const boards = PERIODS.map(([p]) => ['s_' + ids[p], p]);
     boards.push(['s_all_p' + r.dex, 'p']);
     const better = await store(boards, fb.uid, entry);
-    championAt = 0;
     announce(better);
     return better;
   }
@@ -304,7 +318,7 @@ G.Ranking = (() => {
 
   // ---------------- leer ----------------
 
-  /** El top 50 de una tabla (1 lectura, o 0 si se leyó hace menos de 30 min). */
+  /** El top 50 de una tabla (1 lectura, o 0 si se leyó hace menos de un día). */
   const inflight = new Map();             // tabla -> lectura en curso (la lista y tu puesto la comparten)
   async function summary(b) {
     const c = cacheGet('s:' + b);
@@ -333,7 +347,7 @@ G.Ranking = (() => {
     const inTop = rows.filter(r => r.uids.some(u => circle.includes(u)));
     // En diario, semanal, mensual y por Pokémon no hay marcas fuera del top 50.
     if (TOP_ONLY.has(period) || dex) return inTop;
-    // Los amigos que no están en el top 50: se buscan aparte (y se guardan 30 min).
+    // Los amigos que no están en el top 50: se buscan aparte (y se guardan un día).
     const ck = 'f:' + b + ':' + circle.slice().sort().join(',');
     let extra = cacheGet(ck);
     if (extra === undefined) {
@@ -356,7 +370,15 @@ G.Ranking = (() => {
   async function collectionTop(friendsOnly = false) {
     const fb = fbx();
     if (!fb) return [];
-    if (!friendsOnly && collectionCache && Date.now() - collectionCache.at < 2 * 60 * 1000) return collectionCache.rows;
+    const scope = !!friendsOnly;
+    if (collectionCache && collectionCache.scope === scope && Date.now() - collectionCache.at < DAILY) return collectionCache.rows;
+    try {
+      const cached = JSON.parse(localStorage.getItem('ps.rk.collection.top.' + (scope ? 'friends' : 'all')) || 'null');
+      if (cached && Date.now() - cached.at < DAILY && Array.isArray(cached.rows)) {
+        collectionCache = { at: cached.at, rows: cached.rows, scope };
+        return cached.rows;
+      }
+    } catch (e) { /* nada */ }
     try {
       let docs;
       if (friendsOnly) {
@@ -370,7 +392,8 @@ G.Ranking = (() => {
         const v = d.data();
         return { uid: d.id, name: v.name || '???', score: v.score | 0, ownedCount: v.ownedCount | 0, shinyCount: v.shinyCount | 0 };
       }).sort((a, b) => (b.score - a.score) || (b.ownedCount - a.ownedCount) || (b.shinyCount - a.shinyCount) || a.name.localeCompare(b.name)).slice(0, TOP);
-      if (!friendsOnly) collectionCache = { at: Date.now(), rows };
+      collectionCache = { at: Date.now(), rows, scope };
+      try { localStorage.setItem('ps.rk.collection.top.' + (scope ? 'friends' : 'all'), JSON.stringify(collectionCache)); } catch (e) { /* nada */ }
       return rows;
     } catch (e) {
       console.warn('[Ranking] colección top:', e.code || e.message);
