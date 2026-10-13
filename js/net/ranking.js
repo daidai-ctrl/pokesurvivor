@@ -30,10 +30,10 @@
  *     Tu puesto exacto, aunque estés el 3.000, sólo en el histórico. Con mucha
  *     gente jugando, ahorra unas 6 de cada 10 escrituras del ranking.
  *
- * Los periodos se cuentan en hora de España (Europe/Madrid).
+ * Los periodos se cuentan en hora de China (Asia/Shanghai).
  */
 G.Ranking = (() => {
-  const TZ = 'Europe/Madrid';
+  const TZ = 'Asia/Shanghai';
   const PERIODS = [['d', 'Diario'], ['w', 'Semanal'], ['m', 'Mensual'], ['a', 'Histórico']];
   // Periodos en los que sólo se guarda el top 50 (ver arriba).
   // ('p' = histórico de un Pokémon: casi cada partida entraba en el de su
@@ -47,7 +47,9 @@ G.Ranking = (() => {
   // Las runs de menos de 1 minuto no se suben (casi nunca entran en una tabla
   // y eran muchas lecturas y escrituras para nada).
   const MIN_T = 60;
-  const TTL = DAILY;                      // caché de lo leído (1 día: menos lecturas de Firestore)
+  const TTL = DAILY;                      // una instantánea diaria por tabla
+  const EMPTY_SUMMARY_TTL = 5 * 60 * 1000; // un vacío no bloquea el día entero
+  const CACHE_PREFIX = 'ps.rk.c.v2.';     // invalida cachés creadas antes del cambio
 
   const fbx = () => G.DB.online ? G.DB.fb : null;
 
@@ -86,24 +88,39 @@ G.Ranking = (() => {
   // ---------------- caché en el navegador ----------------
 
   const mem = new Map();                 // clave -> { at, v }
+  const isEmptySummary = v => !v || (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0);
+  const cacheTtl = (k, v) => k.startsWith('s:') && isEmptySummary(v) ? EMPTY_SUMMARY_TTL : TTL;
+  const cacheStorageKey = k => CACHE_PREFIX + k;
   function cacheGet(k) {
     let c = mem.get(k);
-    if (!c) { try { c = JSON.parse(localStorage.getItem('ps.rk.c.' + k) || 'null'); } catch (e) { c = null; } if (c) mem.set(k, c); }
-    return c && Date.now() - c.at < TTL ? c.v : undefined;
+    if (!c) { try { c = JSON.parse(localStorage.getItem(cacheStorageKey(k)) || 'null'); } catch (e) { c = null; } if (c) mem.set(k, c); }
+    return c && Date.now() - c.at < cacheTtl(k, c.v) ? c.v : undefined;
   }
   function cacheSet(k, v) {
     const c = { at: Date.now(), v };
     mem.set(k, c);
-    try { localStorage.setItem('ps.rk.c.' + k, JSON.stringify(c)); } catch (e) { /* lleno */ }
+    try { localStorage.setItem(cacheStorageKey(k), JSON.stringify(c)); } catch (e) { /* lleno */ }
+  }
+  function cacheDrop(k) {
+    mem.delete(k);
+    try { localStorage.removeItem(cacheStorageKey(k)); } catch (e) { /* lleno */ }
+  }
+  function dropBoardCaches(board) {
+    for (const k of [...mem.keys()]) {
+      if (k === 's:' + board || k === 'r:' + board || k.startsWith('f:' + board + ':')) cacheDrop(k);
+    }
+    cacheDrop('s:' + board);
+    cacheDrop('r:' + board);
   }
   /** Borra lo caducado (la caché del navegador no crece sin límite). */
   function cachePrune() {
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (!k || !k.startsWith('ps.rk.c.')) continue;
+        if (!k || !k.startsWith(CACHE_PREFIX)) continue;
         const c = JSON.parse(localStorage.getItem(k) || 'null');
-        if (!c || Date.now() - c.at > TTL) localStorage.removeItem(k);
+        const shortKey = k.slice(CACHE_PREFIX.length);
+        if (!c || Date.now() - c.at > cacheTtl(shortKey, c.v)) localStorage.removeItem(k);
       }
     } catch (e) { /* nada */ }
   }
@@ -234,6 +251,8 @@ G.Ranking = (() => {
     if (G.CFData && G.CFData.enabled()) {
       try {
         const result = await G.CFData.storeRanking(boards.map(([board, period]) => ({ board, period })), id, entry);
+        // CF 写入成功后，当前浏览器不能继续展示旧的日榜快照。
+        boards.forEach(([b]) => dropBoardCaches(b));
         return result.better || [];
       } catch (e) {
         console.warn('[Ranking] CF no pudo guardar; se usa Firebase:', e.code || e.message);
