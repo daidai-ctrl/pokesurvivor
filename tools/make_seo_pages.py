@@ -99,7 +99,7 @@ def page(pid, lang, title, desc, body, ld=None):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- Google Analytics 4 -->
+<!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H5KJTWNT655"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -775,6 +775,7 @@ def game_zh_hant():
 # ================= 404, robots y sitemap =================
 def extra():
     nf = '''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H5KJTWNT655"></script><script>
 window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H5KJTWNT655');
 </script>
