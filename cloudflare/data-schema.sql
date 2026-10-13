@@ -76,3 +76,16 @@ CREATE TABLE IF NOT EXISTS presence (
   payload TEXT NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- One-time campaign rewards. The unique key prevents duplicate claims even
+-- when the browser retries after a slow network response.
+CREATE TABLE IF NOT EXISTS share_rewards (
+  uid TEXT NOT NULL,
+  campaign TEXT NOT NULL,
+  tickets_t1 INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'processing',
+  created_at INTEGER NOT NULL,
+  claimed_at INTEGER,
+  PRIMARY KEY (uid, campaign)
+);
+CREATE INDEX IF NOT EXISTS share_rewards_uid_idx ON share_rewards(uid, campaign);

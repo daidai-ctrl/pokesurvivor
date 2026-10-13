@@ -45,6 +45,8 @@ G.CFData = (() => {
     countAbove: (board, t) => get('/v1/ranking/count?' + qs({ board, t })).then(x => +x.count || 0),
     storeRanking: (boards, id, entry) => request('/v1/ranking/store', { method: 'POST', body: JSON.stringify({ boards, id, entry }) }),
     removeRanking: () => del('/v1/ranking/remove'),
+    shareRewardStatus: campaign => get('/v1/rewards/share?' + qs({ campaign })),
+    claimShareReward: campaign => request('/v1/rewards/share', { method: 'POST', body: JSON.stringify({ campaign }) }),
     getProfile: uid => get('/v1/profile?' + qs({ uid })).then(x => x.profile || null),
     putProfile: value => put('/v1/profile', value),
     deleteProfile: () => del('/v1/profile'),

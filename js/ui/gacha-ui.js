@@ -51,6 +51,17 @@ G.GachaUI = (() => {
       purchase.href = WAFFO_CHECKOUT_URL;
       purchase.textContent = PURCHASE_LABEL[G.I18n.lang] || PURCHASE_LABEL.es;
       purchase.title = PURCHASE_LABEL[G.I18n.lang] || PURCHASE_LABEL.es;
+      purchase.addEventListener('click', () => {
+        // Waffo hosts the checkout, so this is intentionally only a checkout
+        // start event; the game must never treat a click as a paid order.
+        G.Analytics.event('begin_checkout', {
+          payment_method: 'waffo',
+          item_id: 'tickets10',
+          value: 9.9,
+          currency: 'USD',
+          quantity: 10
+        });
+      });
     }
     updatePurchaseCards();
     if (G.PayPalUI) G.PayPalUI.init();

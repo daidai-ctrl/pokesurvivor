@@ -86,6 +86,7 @@ G.MenuUI = (() => {
       });
     }
     G.InvitePop.refresh();
+    if (G.ShareUI && G.ShareUI.refresh) G.ShareUI.refresh();
   }
 
   function renderChampion() {

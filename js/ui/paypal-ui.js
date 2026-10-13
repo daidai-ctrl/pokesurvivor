@@ -5,6 +5,13 @@
 G.PayPalUI = (() => {
   const $ = id => document.getElementById(id);
   let api = '', config = null, sdkPromise = null, mounted = false;
+  const PRODUCT = { item_id: 'tickets10', value: 9.9, currency: 'USD', quantity: 10 };
+
+  function paymentEvent(name, params = {}) {
+    if (!G.Analytics) return;
+    G.Analytics.event(name, Object.assign({}, PRODUCT, { payment_method: 'paypal' }, params));
+  }
+
   const COPY = {
     es: {
       login: 'Inicia sesión y sincroniza tu partida antes de pagar.',
@@ -124,21 +131,39 @@ G.PayPalUI = (() => {
           if (!G.DB.online || G.DB.syncState !== 'ok') throw new Error(copy().login);
         }
         status(copy().creating);
+        paymentEvent('begin_checkout');
         const requestId = 'ps-' + crypto.randomUUID();
         const result = await request('/v1/orders', { method: 'POST', headers: { 'Idempotency-Key': requestId }, body: JSON.stringify({ product: 'tickets10' }) });
+        paymentEvent('paypal_order_created');
         return result.orderId;
       },
       onApprove: async data => {
+        let captured = false;
         try {
           status(copy().approving);
           const result = await request('/v1/orders/' + encodeURIComponent(data.orderID) + '/capture', { method: 'POST', body: '{}' });
+          captured = true;
+          paymentEvent('paypal_payment_captured');
           await syncAndClaim(result.grantId);
+          paymentEvent('purchase', { fulfillment: 'tickets' });
           status(copy().success);
           if (G.GachaUI && G.GachaUI.refresh) G.GachaUI.refresh();
-        } catch (e) { status(e.message || '付款已完成，但票券正在等待同步，请稍后重试。', true); }
+        } catch (e) {
+          paymentEvent(captured ? 'payment_delivery_pending' : 'payment_error', {
+            error_stage: captured ? 'ticket_delivery' : 'capture'
+          });
+          status(e.message || '付款已完成，但票券正在等待同步，请稍后重试。', true);
+        }
       },
-      onCancel: () => status(copy().cancel),
-      onError: e => { console.error('[PayPal]', e); status(copy().error, true); }
+      onCancel: () => {
+        paymentEvent('payment_cancelled');
+        status(copy().cancel);
+      },
+      onError: e => {
+        console.error('[PayPal]', e);
+        paymentEvent('payment_error', { error_stage: 'paypal_sdk' });
+        status(copy().error, true);
+      }
     }).render('#paypal-buttons');
   }
 

@@ -230,6 +230,12 @@
     </div>
   </div>
   <div class="menu-right">
+    <aside class="share-reward-card box" id="share-reward-card" hidden aria-live="polite">
+      <div class="share-reward-head"><b id="share-reward-title">Comparte y gana 5 tickets</b><button class="share-reward-close" id="share-reward-close" type="button" aria-label="Cerrar">×</button></div>
+      <p id="share-reward-body">Comparte PokéSurvivor con tus amigos y recibe 5 tickets dorados. Una vez por cuenta.</p>
+      <button class="btn gold share-reward-btn" id="share-reward-btn" type="button">Compartir y recibir 5 tickets</button>
+      <p class="note" id="share-reward-status" role="status"></p>
+    </aside>
     <div class="box">
       <div class="menu-list">
         <button class="menu-item play" data-go="play">Jugar<small>Entra en la mazmorra</small></button>
@@ -664,6 +670,7 @@
 <script defer src="js/ui/settings-ui.js"></script>
 <script defer src="js/ui/support-ui.js"></script>
 <script defer src="js/ui/news-ui.js"></script>
+<script defer src="js/ui/share-ui.js"></script>
 <!-- juego -->
 <script defer src="js/game.js"></script>
 <script defer src="js/main.js"></script>

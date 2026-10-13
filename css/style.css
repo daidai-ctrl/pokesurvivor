@@ -134,6 +134,16 @@ input { font: inherit; }
 .menu-item small { grid-column: 2; }
 .mi-ico { grid-row: span 2; display: flex; }
 
+.share-reward-card { position: relative; padding: 14px 16px; border-color: var(--gold); background: linear-gradient(135deg, rgba(87,56,20,.9), rgba(31,31,75,.92)); box-shadow: 0 0 0 2px rgba(192,138,16,.55), 0 0 16px rgba(255,210,63,.25); }
+.share-reward-head { display: flex; align-items: flex-start; gap: 8px; color: var(--gold); font-size: 18px; line-height: 1.1; text-shadow: 2px 2px 0 var(--shadow); }
+.share-reward-head b { flex: 1; }
+.share-reward-close { appearance: none; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 24px; line-height: 18px; padding: 0 2px; }
+.share-reward-close:hover, .share-reward-close:focus-visible { color: #fff; outline: none; }
+.share-reward-card p { margin: 8px 0 10px; color: var(--muted); line-height: 1.3; }
+.share-reward-btn { width: 100%; font-size: 16px; }
+.share-reward-card .note { min-height: 0; margin: 8px 0 0; color: var(--gold); }
+.share-reward-card .note.error { color: #ffb0b8; }
+
 /* ---------- formularios ---------- */
 .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
 .tab {

@@ -11,6 +11,8 @@ const ORIGINS = new Set([
 ]);
 const JWKS = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 const TOP = 50;
+const SHARE_CAMPAIGN = 'share_t1_5_v1';
+const SHARE_TICKETS = 5;
 let keys = null, keysAt = 0;
 
 const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), {
@@ -153,6 +155,65 @@ async function storeRanking(env, uid, value) {
   return { better };
 }
 
+async function claimShareReward(env, uid, value) {
+  const campaign = String(value && value.campaign || '');
+  if (campaign !== SHARE_CAMPAIGN) return { error: 'invalid_campaign', status: 400 };
+  const now = Date.now();
+  const existing = await env.pokesurvivor_data.prepare(
+    'SELECT status, created_at FROM share_rewards WHERE uid = ? AND campaign = ?'
+  ).bind(uid, campaign).first();
+  if (existing && existing.status === 'claimed') return { ok: true, alreadyClaimed: true, tickets: 0 };
+  if (existing && Number(existing.created_at || 0) > now - 10 * 60 * 1000) return { error: 'reward_busy', status: 409 };
+  if (existing) await env.pokesurvivor_data.prepare('DELETE FROM share_rewards WHERE uid = ? AND campaign = ?').bind(uid, campaign).run();
+
+  const inserted = await env.pokesurvivor_data.prepare(
+    `INSERT OR IGNORE INTO share_rewards(uid, campaign, tickets_t1, status, created_at)
+     VALUES(?, ?, ?, 'processing', ?)`
+  ).bind(uid, campaign, SHARE_TICKETS, now).run();
+  if (!inserted.meta || !inserted.meta.changes) return { error: 'reward_busy', status: 409 };
+
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const row = await env.pokesurvivor_data.prepare('SELECT payload, game_updated FROM saves WHERE uid = ?').bind(uid).first();
+      if (!row) return { error: 'sync_required', status: 409 };
+      const save = parse(row.payload, null);
+      if (!save || typeof save !== 'object') return { error: 'save_invalid', status: 409 };
+      save.tickets = save.tickets || { t1: 0, t10: 0 };
+      save.tickets.t1 = Math.max(0, Number(save.tickets.t1) || 0) + SHARE_TICKETS;
+      save.updated = Math.max(Number(save.updated) || 0, Date.now());
+      const result = await env.pokesurvivor_data.prepare(
+        `UPDATE saves SET payload = ?, game_updated = ?, updated_at = ?
+         WHERE uid = ? AND game_updated = ?`
+      ).bind(JSON.stringify(save), Math.floor(save.updated), Date.now(), uid, Number(row.game_updated || 0)).run();
+      if (result.meta && result.meta.changes) {
+        await env.pokesurvivor_data.prepare(
+          `UPDATE share_rewards SET status = 'claimed', claimed_at = ?
+           WHERE uid = ? AND campaign = ? AND status = 'processing'`
+        ).bind(Date.now(), uid, campaign).run();
+        return { ok: true, alreadyClaimed: false, tickets: SHARE_TICKETS, save };
+      }
+    }
+    return { error: 'save_busy', status: 409 };
+  } finally {
+    // A failed grant must be retryable; a claimed row is retained forever.
+    const current = await env.pokesurvivor_data.prepare(
+      'SELECT status FROM share_rewards WHERE uid = ? AND campaign = ?'
+    ).bind(uid, campaign).first();
+    if (current && current.status !== 'claimed') {
+      await env.pokesurvivor_data.prepare('DELETE FROM share_rewards WHERE uid = ? AND campaign = ?').bind(uid, campaign).run();
+    }
+  }
+}
+
+async function shareRewardStatus(env, uid, value) {
+  const campaign = String(value && value.campaign || '');
+  if (campaign !== SHARE_CAMPAIGN) return { error: 'invalid_campaign', status: 400 };
+  const row = await env.pokesurvivor_data.prepare(
+    'SELECT status FROM share_rewards WHERE uid = ? AND campaign = ?'
+  ).bind(uid, campaign).first();
+  return { ok: true, claimed: !!row && row.status === 'claimed' };
+}
+
 async function collections(env, uids) {
   if (uids.length) {
     const q = uids.map(() => '?').join(',');
@@ -248,6 +309,16 @@ async function handle(req, env, uid, url) {
        WHERE EXISTS (SELECT 1 FROM json_each(json_extract(payload, '$.uids')) WHERE value = ?)`
     ).bind(uid).run();
     return json({ ok: true });
+  }
+
+  if (path === 'rewards/share' && method === 'GET') {
+    const campaign = url.searchParams.get('campaign') || '';
+    const result = await shareRewardStatus(env, uid, { campaign });
+    return result.error ? json({ error: result.error }, result.status || 400) : json(result);
+  }
+  if (path === 'rewards/share' && method === 'POST') {
+    const result = await claimShareReward(env, uid, await readBody(req));
+    return result.error ? json({ error: result.error }, result.status || 400) : json(result);
   }
 
   if (path === 'profile') {
