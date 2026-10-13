@@ -42,6 +42,11 @@ G.PayPalUI = (() => {
     return COPY[G.I18n && G.I18n.lang] || COPY.es;
   }
 
+  function sdkLocale() {
+    const lang = G.I18n && G.I18n.lang;
+    return lang === 'zh-hant' ? 'zh_TW' : lang === 'en' ? 'en_US' : 'es_ES';
+  }
+
   function apiUrl() {
     return String(G.PAYPAL_API_URL || '').replace(/\/$/, '');
   }
@@ -59,7 +64,8 @@ G.PayPalUI = (() => {
     if (sdkPromise) return sdkPromise;
     sdkPromise = new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(clientId) + '&currency=USD&intent=capture&components=buttons';
+      s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(clientId)
+        + '&currency=USD&intent=capture&components=buttons&locale=' + encodeURIComponent(sdkLocale());
       s.onload = () => window.paypal ? resolve(window.paypal) : reject(new Error('PayPal SDK missing'));
       s.onerror = () => reject(new Error('PayPal SDK failed'));
       document.head.appendChild(s);
