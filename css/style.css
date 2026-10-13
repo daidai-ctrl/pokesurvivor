@@ -218,7 +218,6 @@ label { display: block; font-size: 14px; color: var(--muted); margin: 8px 0 4px;
   background: rgba(0,0,0,.2); border: 2px solid rgba(244,248,255,.2); border-radius: 10px; padding: 14px;
 }
 .purchase-card { margin-top: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.purchase-card-top { margin-top: 0; margin-bottom: 10px; }
 .purchase-card .sub { margin: 0; flex: 1 1 100%; }
 .stat { display: grid; grid-template-columns: 90px 1fr 34px; gap: 8px; align-items: center; font-size: 14px; margin: 5px 0; }
 .stat .bar { height: 8px; background: rgba(0,0,0,.35); border-radius: 6px; overflow: hidden; }
