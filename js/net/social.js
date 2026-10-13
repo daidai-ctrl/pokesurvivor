@@ -98,6 +98,7 @@ G.Social = (() => {
     me = { uid, name };
     try { localStorage.setItem('ps.nick.' + uid, name); } catch (e) { /* nada */ }
     G.DB.setName(name);
+    G.Analytics.event('nickname_created');
     if (started && !beatT) online();
     publishProfile(true);
     return { ok: true };
@@ -249,6 +250,7 @@ G.Social = (() => {
         names: { [uid]: me.name, [other]: otherName },
         at: firebase.firestore.FieldValue.serverTimestamp()
       });
+      G.Analytics.event('friend_request_sent');
       return { ok: true, msg: 'Solicitud enviada a ' + otherName };
     } catch (e) { return { ok: false, error: 'No se pudo enviar (' + (e.code || 'error') + ').' }; }
   }
@@ -260,6 +262,7 @@ G.Social = (() => {
       await fb.fs.collection('friendships').doc(f.pid).update({
         status: 'ok', at: firebase.firestore.FieldValue.serverTimestamp(), ['names.' + uid]: me.name
       });
+      G.Analytics.event('friend_request_accepted');
       return { ok: true, msg: 'Ahora eres amigo de ' + f.name };
     } catch (e) { return { ok: false, error: 'No se pudo aceptar (' + (e.code || 'error') + ').' }; }
   }
@@ -293,6 +296,7 @@ G.Social = (() => {
     const id = fb.rtdb.ref('rooms').push().key;
     await fb.rtdb.ref('rooms/' + id).set({ host: uid, open: true, at: ts(), m: { [uid]: memberInfo() } });
     enterRoom(id, uid);
+    G.Analytics.event('room_created', { players: 1 });
     return room;
   }
 
@@ -316,6 +320,7 @@ G.Social = (() => {
       return { ok: false, error: 'La sala está llena (máximo ' + MAX_PLAYERS + ').' };
     }
     enterRoom(id, host);
+    G.Analytics.event('room_joined');
     return { ok: true };
   }
 
@@ -365,6 +370,7 @@ G.Social = (() => {
   async function leaveRoom() {
     if (!room) return;
     const r = room;
+    G.Analytics.event('room_left', { role: r.isHost ? 'host' : 'member' });
     detachRoom();
     room = null;
     const ref = r.isHost ? fb.rtdb.ref('rooms/' + r.id) : fb.rtdb.ref('rooms/' + r.id + '/m/' + uid);
@@ -399,6 +405,7 @@ G.Social = (() => {
       await fb.fs.collection('inv').doc(other + '_' + uid).set({ to: other, from: uid, room: room.id, name: me.name, at: fts() });
     } catch (e) { return { ok: false, error: 'No se pudo invitar (' + (e.code || 'error') + ').' }; }
     sentInv.add(other);
+    G.Analytics.event('invite_sent');
     return { ok: true, msg: 'Invitación enviada a ' + f.name };
   }
 
@@ -415,6 +422,7 @@ G.Social = (() => {
     const f = friends.get(v.from);
     if (f && f.status !== 'ok') return;
     invites.set(v.from, { from: v.from, name: v.name, room: v.room, at: msOf(v.at) || Date.now() });
+    G.Analytics.event('invite_received');
     emit('invites');
   }
 
@@ -426,12 +434,15 @@ G.Social = (() => {
     invites.delete(from);
     invDoc(from).delete().catch(() => {});
     emit('invites');
-    return joinRoom(inv.room);
+    const result = await joinRoom(inv.room);
+    if (result.ok) G.Analytics.event('invite_accepted');
+    return result;
   }
 
   function declineInvite(from) {
     invites.delete(from);
     invDoc(from).delete().catch(() => {});
+    G.Analytics.event('invite_declined');
     emit('invites');
   }
 

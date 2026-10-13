@@ -11,6 +11,7 @@ G.TestUI = (() => {
   }
 
   function start() {
+    G.Analytics.once('starter_test', 'tutorial_begin');
     idx = 0; scores = {}; result = null;
     G.UI.chrome(false);
     G.UI.show('scr-test');
@@ -82,11 +83,14 @@ G.TestUI = (() => {
 
   function choose(dex) {
     const save = G.DB.save;
+    const firstChoice = !save.partner;
     save.starter = dex;
     save.partner = dex;
     save.personality = result ? { trait: result.trait, scores } : null;
     G.DB.grant(dex, 'starter');
     G.DB.commit();
+    G.Analytics.event('partner_selected', { partner_dex: dex, first_choice: firstChoice ? 'yes' : 'no' });
+    if (firstChoice) G.Analytics.once('starter_complete', 'tutorial_complete');
     G.UI.toast('¡' + G.DEX_BY[dex].name + ' se une a ti!');
     G.Flow.goMenu();
   }

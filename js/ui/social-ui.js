@@ -73,7 +73,15 @@
       if (t) G.Audio.sfx(bad ? 'error' : 'confirm');
     }
 
-    function open() { withNick(() => { G.UI.show('scr-friends', true); msg(''); render(); G.Social.refreshPresence(); }); }
+  function open() {
+    withNick(() => {
+      G.Analytics.event('friends_opened');
+      G.UI.show('scr-friends', true);
+      msg('');
+      render();
+      G.Social.refreshPresence();
+    });
+  }
 
     /** "hace 5 min", "hace 2 h", "hace 3 días". */
     function ago(t) {
@@ -259,6 +267,7 @@
         k: 'start', seed: Math.floor(Math.random() * 1e6), host: room.host,
         members: room.members.map(m => ({ uid: m.uid, name: m.name, dex: m.dex, shiny: !!m.shiny }))
       };
+      G.Analytics.event('coop_started', { players: room.members.length });
       G.Social.setOpen(false);
       G.Net.broadcast(cfg);
       G.Flow.startCoop(cfg);

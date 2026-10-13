@@ -88,6 +88,11 @@ G.Game = (() => {
   function startRun(coop = null) {
     holdBy = []; awayBy = null;
     const save = G.DB.save;
+    G.Analytics.event('run_started', {
+      mode: coop ? 'coop' : 'solo',
+      players: coop && coop.members ? coop.members.length : 1,
+      first_run: !save.stats.runs ? 'yes' : 'no'
+    });
     const mon = G.DEX_BY[save.partner];
     const perks = G.Upgrades.perks(G.DB.upgradesOf(mon.dex));
 
@@ -275,6 +280,13 @@ G.Game = (() => {
     const coop = !!pl.uid;                    // sólo las partidas en grupo le ponen uid
     const wasHost = !!pl.coopHost;
     const team = coop ? G.Coop.members.slice() : [];
+    G.Analytics.event('run_ended', {
+      mode: coop ? 'coop' : 'solo',
+      outcome: dead ? 'defeat' : 'abandoned',
+      duration_sec: Math.floor(time),
+      level: pl.level,
+      players: coop ? Math.max(1, team.length) : 1
+    });
     if (G.Coop.active) G.Coop.end();
     if (coop) G.Social.setPlaying(false);
     state = 'over';
@@ -806,6 +818,7 @@ G.Game = (() => {
 /* ============ Flow — transiciones entre pantallas ============ */
 G.Flow = {
   boot() {
+    G.Analytics.once('game_open', 'game_open');
     G.UI.initChrome();
     G.LoginUI.init(); G.TestUI.init(); G.MenuUI.init(); G.GachaUI.init();
     G.SocialUI.init(); G.RankingUI.init(); G.GoalsUI.init(); G.ProfileUI.init(); G.SettingsUI.init(); G.SupportUI.init(); G.NewsUI.init();

@@ -24,6 +24,7 @@ G.GachaUI = (() => {
   }
 
   function open() {
+    G.Analytics.event('gacha_opened');
     G.UI.show('scr-gacha', true);
     refresh();
   }
@@ -82,6 +83,7 @@ G.GachaUI = (() => {
     if (busy) return;
     const res = G.Gacha.pull(G.DB.save, n, gen, use);
     if (!res) { G.Audio.sfx('error'); G.UI.toast('No tienes tickets suficientes: consíguelos jugando'); return; }
+    G.Analytics.event('gacha_pull', { count: n, generation: gen, ticket_type: use === 't10' ? 'ticket10' : 'ticket' });
     G.Progress.checkAch();
     G.DB.commit(true);
     busy = true;

@@ -20,6 +20,7 @@ G.SupportUI = (() => {
   }
 
   function open() {
+    G.Analytics.event('support_opened');
     const rows = F.costs.map(([c, v]) => `<tr><td>${c}</td><td class="num">${val(v)}</td></tr>`).join('');
     $('sup-body').innerHTML = `
       <p>PokéSurvivor es y será <b>gratis</b>, sin anuncios ni compras. Si quieres ayudar a que siga en línea, puedes hacer una
@@ -32,6 +33,8 @@ G.SupportUI = (() => {
         <a class="btn gold" href="${F.url}" target="_blank" rel="noopener">${G.Icons.html('heart', 18)} Donar en Ko-fi</a>
         ${window.PS_PAGES ? `<a class="btn" href="${G.I18n.lang === 'en' || G.I18n.lang === 'zh-hant' ? 'en/support/' : 'apoyar/'}" target="_blank">Más información</a>` : ''}
       </div>`;
+    const donate = $('sup-body').querySelector('a.btn.gold');
+    if (donate) donate.onclick = () => G.Analytics.event('support_click');
     $('scr-support').classList.remove('hidden');
   }
   function close() { $('scr-support').classList.add('hidden'); }

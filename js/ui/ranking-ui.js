@@ -32,6 +32,7 @@ G.RankingUI = (() => {
 
   function open() {
     if (!G.SocialUI.needOnline()) return;
+    G.Analytics.event('ranking_opened');
     G.UI.show('scr-rank', true);
     if (!G.Social.started) G.Social.start();
     tabs();

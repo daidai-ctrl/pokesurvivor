@@ -14,17 +14,31 @@ G.LoginUI = (() => {
       const fn = mode === 'login' ? G.DB.login : G.DB.register;
       const r = await fn($('f-user').value, $('f-pass').value);
       $('btn-auth').disabled = false;
-      if (!r.ok) { $('login-err').textContent = r.error; return; }
+      if (!r.ok) {
+        G.Analytics.event('auth_error', { method: 'password', action: mode });
+        $('login-err').textContent = r.error;
+        return;
+      }
+      G.Analytics.event(mode === 'login' ? 'login' : 'sign_up', { method: 'password' });
       $('f-pass').value = '';
       G.Flow.afterLogin();
     };
-    $('btn-guest').onclick = () => { G.DB.playAsGuest(); G.Flow.afterLogin(); };
+    $('btn-guest').onclick = () => {
+      G.Analytics.event('guest_started');
+      G.DB.playAsGuest();
+      G.Flow.afterLogin();
+    };
     $('btn-google').onclick = async () => {
       $('login-err').textContent = '';
       $('btn-google').disabled = true;
       const r = await G.DB.loginWithGoogle();
       $('btn-google').disabled = false;
-      if (!r.ok) { $('login-err').textContent = r.error; return; }
+      if (!r.ok) {
+        G.Analytics.event('auth_error', { method: 'google', action: 'login' });
+        $('login-err').textContent = r.error;
+        return;
+      }
+      G.Analytics.event(r.isNew ? 'sign_up' : 'login', { method: 'google' });
       G.Flow.afterLogin();
     };
   }
