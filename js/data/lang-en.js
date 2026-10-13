@@ -381,7 +381,7 @@ if (G.I18n.lang === 'en') G.I18n.add({
   'Histórico': 'All-time', 'Sólo amigos': 'Friends only', 'Filtrar por Pokémon (histórico)': 'Filter by Pokémon (all-time)', 'Quitar filtro': 'Clear filter',
   'colección histórica': 'all-time collection', 'Puntuación:': 'Score:', 'Shiny ×2': 'Shiny ×2', 'especies': 'species', 'puntos': 'points', 'pts': 'pts',
   '{x} Solo': '{x} Solo', '{x} Grupo': '{x} Group', 'Grupo': 'Group', 'Todavía no hay marcas aquí. ¡Sé el primero!': 'No records here yet. Be the first!',
-  'Todavía no hay colecciones publicadas. ¡Sé el primero!': 'No collections have been published yet. Be the first!', 'Tu colección:': 'Your collection:', 'Campeón mundial · Solo': 'World Champion · Solo',
+  'Todavía no hay colecciones publicadas. ¡Sé el primero!': 'No collections have been published yet. Be the first!', 'Tu colección:': 'Your collection:', 'Campeón mundial · Solo': 'World Champion · Solo', 'Mejor histórico': 'All-time best', 'Esperando el primer récord': 'Awaiting first record',
   'No hay ningún Pokémon con ese nombre': 'There\'s no Pokémon with that name', 'No se pudo cargar el ranking ({x}).': 'Couldn\'t load the leaderboard ({x}).',
   'Elige un apodo (en Amigos) para salir en el ranking.': 'Choose a nickname (in Friends) to appear on the leaderboard.',
   'Tu mejor puesto {x} {x}:': 'Your best rank {x} {x}:', 'Aún no tienes marca {x} {x}.': 'You don\'t have a record {x} {x} yet.',

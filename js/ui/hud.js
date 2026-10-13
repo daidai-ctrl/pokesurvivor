@@ -29,28 +29,46 @@ G.HUD = (() => {
   function drawChampion(ctx, w) {
     if (!G.Ranking || !G.Ranking.getChampion) return;
     const champion = G.Ranking.getChampion();
-    if (!champion) return;
-    const name = (champion.names && champion.names[0]) || '???';
-    const cardW = Math.min(292, Math.max(214, Math.floor(w * .34)));
-    const x = 14, y = 70, cardH = 46;
+    const name = champion ? ((champion.names && champion.names[0]) || '???') : G.T('Esperando el primer récord');
+    const cardW = Math.min(360, Math.max(280, Math.floor(w * .38)));
+    const x = 14, y = 70, cardH = 88;
     ctx.save();
+    ctx.shadowColor = 'rgba(255,210,63,.72)'; ctx.shadowBlur = 12;
     roundRect(ctx, x + 2, y + 3, cardW, cardH, 10);
-    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.58)'; ctx.fill();
+    ctx.shadowBlur = 0;
     roundRect(ctx, x, y, cardW, cardH, 10);
     const bg = ctx.createLinearGradient(x, y, x + cardW, y + cardH);
-    bg.addColorStop(0, 'rgba(74,49,125,.96)');
-    bg.addColorStop(.55, 'rgba(35,53,112,.96)');
-    bg.addColorStop(1, 'rgba(20,91,106,.94)');
+    bg.addColorStop(0, 'rgba(29,23,40,.98)');
+    bg.addColorStop(.5, 'rgba(8,26,42,.98)');
+    bg.addColorStop(1, 'rgba(24,61,79,.97)');
     ctx.fillStyle = bg; ctx.fill();
-    ctx.lineWidth = 2; ctx.strokeStyle = '#ffd23f'; ctx.stroke();
-    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.45)';
+    ctx.lineWidth = 3; ctx.strokeStyle = '#ffd23f'; ctx.stroke();
+    ctx.lineWidth = 1; ctx.strokeStyle = '#c08a10';
     roundRect(ctx, x + 4, y + 4, cardW - 8, cardH - 8, 7); ctx.stroke();
-    G.Icons.draw(ctx, 'crown', x + 9, y + 9, 28);
-    ctx.textAlign = 'left';
-    ctx.font = F(800, 10); ctx.fillStyle = '#ffe37a';
-    ctx.fillText('Campeón mundial · Solo', x + 45, y + 16);
-    ctx.font = F(800, 16); ctx.fillStyle = '#fff';
-    ctx.fillText(name, x + 45, y + 36);
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,243,176,.82)';
+    roundRect(ctx, x + 7, y + 7, cardW - 14, cardH - 14, 5); ctx.stroke();
+
+    // Pixel-style laurel branches, matching the gold champion card artwork.
+    const laurel = dir => {
+      ctx.save(); ctx.strokeStyle = '#ffd23f'; ctx.fillStyle = '#ffd23f'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x + (dir > 0 ? 27 : cardW - 27), y + 67);
+      ctx.quadraticCurveTo(x + (dir > 0 ? 18 : cardW - 18), y + 42, x + (dir > 0 ? 32 : cardW - 32), y + 24); ctx.stroke();
+      for (let i = 0; i < 5; i++) {
+        const lx = x + (dir > 0 ? 22 + i * 3 : cardW - 22 - i * 3), ly = y + 61 - i * 9;
+        ctx.fillRect(lx, ly, 6, 3); ctx.fillRect(lx + (dir > 0 ? 4 : -4), ly - 5, 4, 3);
+      }
+      ctx.restore();
+    };
+    laurel(1); laurel(-1);
+    G.Icons.draw(ctx, 'crown', x + 30, y + 23, 42);
+    ctx.textAlign = 'center';
+    ctx.font = F(800, 11); ctx.fillStyle = '#ffe37a';
+    ctx.fillText(G.T('Campeón mundial · Solo'), x + cardW / 2, y + 22);
+    ctx.font = F(800, 21); ctx.fillStyle = '#fff';
+    ctx.fillText(name, x + cardW / 2 + 20, y + 52);
+    ctx.font = F(700, 10); ctx.fillStyle = '#ffd23f';
+    ctx.fillText(G.T('Mejor histórico'), x + cardW / 2 + 20, y + 71);
     ctx.restore();
   }
 

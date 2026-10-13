@@ -38,6 +38,10 @@ G.MenuUI = (() => {
     const shiny = !!s.partnerShiny && G.DB.ownsShiny(mon.dex);
     G.UI.chrome(true);
     G.UI.show('scr-menu');
+    renderChampion();
+    if (G.Ranking && G.Ranking.loadChampion) {
+      G.Ranking.loadChampion().then(renderChampion).catch(() => {});
+    }
     G.UI.sprite($('menu-partner'), mon.dex, { lively: true, scale: 4, hero: true, shiny });
     $('menu-partner').style.setProperty('--stage-c', shiny ? '#9ae6ff' : G.U.TYPE_COLOR[mon.types[0]]);
     $('menu-partner').classList.toggle('shiny', shiny);
@@ -82,6 +86,18 @@ G.MenuUI = (() => {
       });
     }
     G.InvitePop.refresh();
+  }
+
+  function renderChampion() {
+    const card = $('menu-champion');
+    if (!card || !G.Ranking || !G.Ranking.getChampion) return;
+    const champion = G.Ranking.getChampion();
+    const name = champion ? ((champion.names && champion.names[0]) || '???') : G.T('Esperando el primer récord');
+    $('menu-champion-icon').innerHTML = G.Icons.html('crown', 48);
+    $('menu-champion-title').textContent = G.T('Campeón mundial · Solo');
+    $('menu-champion-name').textContent = name;
+    $('menu-champion-sub').textContent = G.T('Mejor histórico');
+    card.classList.remove('hidden');
   }
 
   /** Texto bajo "Amigos" y "Jugar": quién está en línea, solicitudes, sala. */

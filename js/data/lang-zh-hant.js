@@ -333,7 +333,7 @@ if (G.I18n.lang === 'zh-hant') G.I18n.add({
   'Diario': '每日', 'Semanal': '每週', 'Mensual': '每月', 'Anual': '每年', 'Histórico': '歷史', 'Sólo amigos': '僅好友',
   'colección histórica': '歷史收藏', 'Puntuación:': '分數：', 'Shiny ×2': '異色 ×2', 'especies': '種', 'puntos': '分', 'pts': '分',
   'Filtrar por Pokémon (histórico)': '依寶可夢篩選（歷史）', 'Todavía no hay marcas aquí. ¡Sé el primero!': '這裡還沒有紀錄，成為第一名吧！',
-  'Todavía no hay colecciones publicadas. ¡Sé el primero!': '目前還沒有公開收藏，成為第一名吧！', 'Tu colección:': '你的收藏：', 'Campeón mundial · Solo': '世界冠軍 · 單人',
+  'Todavía no hay colecciones publicadas. ¡Sé el primero!': '目前還沒有公開收藏，成為第一名吧！', 'Tu colección:': '你的收藏：', 'Campeón mundial · Solo': '世界冠軍 · 單人', 'Mejor histórico': '歷史最佳', 'Esperando el primer récord': '等待首個紀錄',
   'No hay ningún Pokémon con ese nombre': '找不到這個名稱的寶可夢', 'Elige un apodo (en Amigos) para salir en el ranking.': '請先在好友中設定暱稱，才能出現在排行榜。',
   'Gráficos': '畫面', 'Silenciar todo': '全部靜音', 'Activar sonido': '開啟聲音', 'Sí': '是', 'No': '否',
   'alta': '高', 'media': '中', 'baja': '低', 'Sin barras del navegador.': '隱藏瀏覽器工具列',

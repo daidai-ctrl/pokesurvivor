@@ -174,6 +174,12 @@ G.Ranking = (() => {
     return championCache;
   }
 
+  /** Promise variant for screens that need to repaint after the first fetch. */
+  function loadChampion(force = false) {
+    getChampion(force);
+    return championInflight || Promise.resolve(championCache);
+  }
+
   async function syncCollection(force = false) {
     const fb = fbx();
     if (!fb || !G.Social.me || !G.DB.save) return collectionStats(G.DB.save);
@@ -458,6 +464,6 @@ G.Ranking = (() => {
 
   return {
     PERIODS, periodIds, board, runStarted, submitSolo, submitGroup, top, myRank, removeMine,
-    getChampion, collectionStats, syncCollection, collectionTop
+    getChampion, loadChampion, collectionStats, syncCollection, collectionTop
   };
 })();
