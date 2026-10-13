@@ -109,8 +109,10 @@ function captureOf(order) {
 
 function validateCapture(order, row) {
   const capture = captureOf(order);
+  const amount = Number(capture.value);
   if (order.status !== 'COMPLETED' || capture.status !== 'COMPLETED'
-      || capture.currency !== row.currency || capture.value !== PRICE) throw new Error('payment_not_completed');
+      || !capture.id || capture.currency !== row.currency || !Number.isFinite(amount)
+      || amount.toFixed(2) !== PRICE) throw new Error('payment_not_completed');
   return capture;
 }
 
@@ -170,16 +172,34 @@ async function captureOrder(env, uid, paypalOrderId) {
   ).bind(paypalOrderId, uid).first();
   if (!row) return { error: 'order_not_found', status: 404 };
   if (row.status === 'captured') return recordCapture(env, row, { id: row.capture_id, status: 'COMPLETED', currency: row.currency, value: PRICE });
-  let order;
+
+  // Read first so a retry after a successful PayPal capture is idempotent and
+  // does not send a second capture request.
+  let order = null;
   try {
-    order = await paypalRequest(env, `/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
-      method: 'POST', headers: { 'PayPal-Request-Id': 'capture-' + row.internal_id }, body: '{}'
-    });
-  } catch (e) {
-    // If the browser retries after a network timeout, PayPal may already have
-    // captured the order. Read it back and still create/return the one grant.
-    if (e.status !== 409 && e.status !== 422) throw e;
     order = await paypalRequest(env, `/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`, { method: 'GET' });
+  } catch (e) { /* fall through to capture */ }
+
+  if (!order || order.status !== 'COMPLETED') {
+    try {
+      order = await paypalRequest(env, `/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
+        method: 'POST', headers: { 'PayPal-Request-Id': 'capture-' + row.internal_id }, body: '{}'
+      });
+    } catch (e) {
+      // PayPal can complete the capture while the browser or Worker times out.
+      // Read the order back on every capture error before reporting failure.
+      try {
+        const latest = await paypalRequest(env, `/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`, { method: 'GET' });
+        if (latest.status === 'COMPLETED') order = latest;
+        else throw e;
+      } catch (readError) {
+        throw e;
+      }
+    }
+  }
+
+  if (!order || order.status !== 'COMPLETED') {
+    throw new Error('payment_not_completed');
   }
   const capture = validateCapture(order, row);
   const grant = await recordCapture(env, row, capture);
@@ -295,7 +315,8 @@ export default {
       return response;
     } catch (e) {
       console.error('[paypal-worker]', e);
-      return json({ error: e.message === 'paypal_not_configured' ? e.message : 'server_error' }, e.status || 500, headers);
+      const safeErrors = new Set(['paypal_not_configured', 'payment_not_completed']);
+      return json({ error: safeErrors.has(e.message) ? e.message : 'server_error' }, e.status || 500, headers);
     }
   }
 };
