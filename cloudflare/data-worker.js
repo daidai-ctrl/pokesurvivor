@@ -99,11 +99,40 @@ async function entriesForUsers(env, board, users) {
     .filter(row => (row.data.uids || []).some(x => users.includes(x)));
 }
 
+async function validateRanking(env, uid, board, id, entry) {
+  if (!entry || !id || !board) throw new Error('invalid ranking payload');
+  const t = Number(entry.t), lv = Number(entry.lv), kills = Number(entry.kills);
+  const uids = Array.isArray(entry.uids) ? entry.uids.map(String) : [];
+  const names = Array.isArray(entry.names) ? entry.names : [];
+  const dex = Array.isArray(entry.dex) ? entry.dex : [];
+  const shiny = Array.isArray(entry.shiny) ? entry.shiny : [];
+  if (!Number.isInteger(t) || t <= 0 || t > 21600
+      || !Number.isInteger(lv) || lv < 1 || lv > 10 + t / 4
+      || !Number.isInteger(kills) || kills < 0 || kills > 100 + t * 12
+      || uids.length < 1 || uids.length > 4
+      || names.length !== uids.length || dex.length !== uids.length || shiny.length !== uids.length
+      || !uids.includes(uid) || new Set(uids).size !== uids.length
+      || names.some(v => typeof v !== 'string' || v.length > 40)
+      || dex.some(v => !Number.isInteger(Number(v)) || Number(v) < 1 || Number(v) > 1100)
+      || shiny.some(v => typeof v !== 'boolean')) throw new Error('invalid ranking payload');
+  if (board.startsWith('s_')) {
+    if (uids.length !== 1 || id !== uid) throw new Error('invalid ranking id');
+  } else if (board.startsWith('g_')) {
+    if (uids.length < 2 || id !== uids.join('_')) throw new Error('invalid ranking id');
+  } else {
+    throw new Error('invalid ranking board');
+  }
+  const run = await env.pokesurvivor_data.prepare('SELECT payload FROM runs WHERE uid = ?').bind(uid).first();
+  const startedAt = Number(parse(run && run.payload, {}).startedAt || 0);
+  if (!startedAt || t > Math.floor((Date.now() - startedAt) / 1000) + 15) throw new Error('ranking run not validated');
+}
+
 async function storeRanking(env, uid, value) {
   const entry = value && value.entry;
   const id = String(value && value.id || '');
   const boards = Array.isArray(value && value.boards) ? value.boards : [];
   if (!entry || !id || !boards.length || !(entry.uids || []).includes(uid)) throw new Error('invalid ranking payload');
+  await validateRanking(env, uid, String(boards[0].board || ''), id, entry);
   const better = [];
   for (const item of boards) {
     const board = String(item.board || '').slice(0, 100), period = String(item.period || '');
@@ -159,9 +188,10 @@ async function handle(req, env, uid, url) {
   if (path === 'run') {
     if (method === 'PUT') {
       const value = await readBody(req) || {};
+      const run = { startedAt: Date.now(), mode: String(value.mode || '').slice(0, 20) };
       await env.pokesurvivor_data.prepare(
         'INSERT INTO runs(uid, payload, updated_at) VALUES(?, ?, ?) ON CONFLICT(uid) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at'
-      ).bind(uid, JSON.stringify(value), Date.now()).run(); return json({ ok: true });
+      ).bind(uid, JSON.stringify(run), Date.now()).run(); return json({ ok: true });
     }
     if (method === 'DELETE') {
       await env.pokesurvivor_data.prepare('DELETE FROM runs WHERE uid = ?').bind(uid).run(); return json({ ok: true });
