@@ -13,6 +13,7 @@ G.CFRoom = (() => {
   const wsUrl = id => base().replace(/^http/i, 'ws') + '/v1/room/ws?room=' + encodeURIComponent(id);
   const enabled = () => !!(base() && window.WebSocket && G.DB && G.DB.fb && G.DB.fb.auth && G.DB.fb.auth.currentUser);
   const send = value => { if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(value)); };
+  const onState = fn => { stateListeners.add(fn); return () => stateListeners.delete(fn); };
 
   function newId() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '');
@@ -112,7 +113,7 @@ G.CFRoom = (() => {
     newId,
     open,
     close,
-    onState(fn) { stateListeners.add(fn); return () => stateListeners.delete(fn); },
+    onState,
     onMessage(fn) { messageListeners.add(fn); return () => messageListeners.delete(fn); },
     send(to, env) { send({ type: 'relay', to: String(to || ''), env }); },
     setOpen(open) { send({ type: 'set-open', open: !!open }); },
