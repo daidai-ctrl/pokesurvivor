@@ -46,6 +46,8 @@ G.LoginUI = (() => {
   /** Explica dónde se guarda la partida según el modo de la base de datos. */
   function modeNote() {
     if (G.DB.mode === 'cloud') return 'Tu partida se guarda en la nube: entra desde cualquier ordenador. Como invitado no se guarda.';
+    if (/^(?:www\.)?pokesurvivor\.xyz$/i.test(location.hostname || ''))
+      return 'No se pudo iniciar la nube: las cuentas están temporalmente desactivadas. Puedes jugar como invitado, pero esa partida no se guarda.';
     const why = G.DB.localReason === 'file'
       ? 'Abierto desde un archivo: la partida sólo se guarda en este navegador. Para guardar en la nube, juega en la versión publicada.'
       : G.DB.localReason === 'config'

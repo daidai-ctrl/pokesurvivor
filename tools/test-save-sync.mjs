@@ -132,7 +132,7 @@ const cfDataSource = readFileSync(new URL('../js/net/cf-data.js', import.meta.ur
 const copy = value => JSON.parse(JSON.stringify(value));
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-function browserDevice(server, isNewUser, entries = new Map(), sdkUnavailable = false) {
+function browserDevice(server, isNewUser, entries = new Map(), sdkUnavailable = false, firebaseConfig = { apiKey: 'test', projectId: 'test' }) {
   let nextLoginIsNew = isNewUser;
   const storage = {
     getItem: key => entries.get(key) ?? null,
@@ -177,11 +177,11 @@ function browserDevice(server, isNewUser, entries = new Map(), sdkUnavailable = 
     }
   };
   const G = {
-    FIREBASE_CONFIG: { apiKey: 'test', projectId: 'test' }, I18n: { lang: 'en' }, CFData: cloud,
+    FIREBASE_CONFIG: firebaseConfig, I18n: { lang: 'en' }, CFData: cloud,
     T: value => value, UI: { refreshCoins() {}, toast() {} }
   };
   const context = {
-    G, localStorage: storage, location: { protocol: 'https:' }, navigator: { onLine: true },
+    G, localStorage: storage, location: { protocol: 'https:', hostname: 'pokesurvivor.xyz' }, navigator: { onLine: true },
     document: {
       createElement: () => ({}), head: { appendChild: el => queueMicrotask(() => sdkUnavailable ? el.onerror() : el.onload()) },
       addEventListener() {}
@@ -284,6 +284,13 @@ test('a Firebase SDK outage does not silently create a browser-only account', as
   assert.equal((await device.db.register('Tester', 'secret-password')).ok, false);
   assert.equal((await device.db.login('Tester', 'secret-password')).ok, false);
   assert.equal(server.save, null);
+});
+
+test('missing Firebase configuration on the published site also blocks local accounts', async () => {
+  const device = browserDevice({ save: null, version: null }, false, new Map(), false, null);
+  assert.equal(await device.db.ready(), false);
+  assert.equal((await device.db.register('Tester', 'secret-password')).ok, false);
+  assert.equal((await device.db.login('Tester', 'secret-password')).ok, false);
 });
 
 test('a save request refuses a switched Firebase identity before sending data', async () => {

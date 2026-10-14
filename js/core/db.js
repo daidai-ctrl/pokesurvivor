@@ -36,6 +36,7 @@ G.DB = (() => {
 
   let mode = 'local';       // 'cloud' | 'local'
   let localReason = '';     // por qué no hay nube: 'file' | 'config' | 'error'
+  const publishedSite = /^(?:www\.)?pokesurvivor\.xyz$/i.test(location.hostname || '');
   let user = null;          // nombre visible
   let key = null;           // clave local (minúsculas) o uid de Firebase
   let guest = false;
@@ -674,7 +675,7 @@ G.DB = (() => {
       // turn a cloud account into a different, browser-only account.
       if (mode === 'local') {
         setSync('local');
-        return localReason === 'error' ? false : restoreLocal();
+        return localReason === 'error' || publishedSite ? false : restoreLocal();
       }
       const u = await new Promise(res => { const off = auth.onAuthStateChanged(x => { off(); res(x); }); });
       if (!u) return false;
@@ -685,7 +686,7 @@ G.DB = (() => {
   }
 
   async function register(name, pass) {
-    if (mode === 'local' && localReason === 'error')
+    if (mode === 'local' && (localReason === 'error' || publishedSite))
       return { ok: false, error: 'El inicio de sesión en la nube no está disponible. Vuelve a intentarlo más tarde; no crearemos una cuenta sólo en este navegador.' };
     name = (name || '').trim();
     if (!VALID.test(name)) return { ok: false, error: 'El nombre debe tener 3-16 letras, números o _.' };
@@ -704,7 +705,7 @@ G.DB = (() => {
   }
 
   async function login(name, pass) {
-    if (mode === 'local' && localReason === 'error')
+    if (mode === 'local' && (localReason === 'error' || publishedSite))
       return { ok: false, error: 'El inicio de sesión en la nube no está disponible. Vuelve a intentarlo más tarde; no crearemos una cuenta sólo en este navegador.' };
     name = (name || '').trim();
     if (mode === 'local') return loginLocal(name, pass);
