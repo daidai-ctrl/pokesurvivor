@@ -29,7 +29,10 @@ G.DB = (() => {
   const K_CLOUD = 'ps.cloud.', K_MIGRATED = 'ps.migrated.';
   const VERSION = 3;
   const START_COINS = 500;
-  const SDK = 'https://www.gstatic.com/firebasejs/13.0.0/';
+  // Keep the compat SDK on a known, widely mirrored version. A failed CDN
+  // load must not silently hide Google sign-in and force the game into local
+  // mode on a fresh page load.
+  const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
   const NAME_DOMAIN = 'jugadores.pokesurvivor.net';   // sólo para el email interno
 
   let mode = 'local';       // 'cloud' | 'local'
