@@ -118,7 +118,7 @@ G.Events = (() => {
       e.life = THIEF_LIFE;
       G.EnemyMgr.add(e);
       G.FX.ring(x, y, 4, 40, '#ffd23f', 0.5, 3);
-      G.Spawner.say(gold ? '¡Un ' + mon.name + ' con un ticket ×10! ¡Atrápalo antes de que huya!'
+      G.Spawner.say(gold ? '¡Un ' + mon.name + ' con un ticket morado! ¡Atrápalo antes de que huya!'
                          : '¡Un ' + mon.name + ' cargado de monedas! ¡Atrápalo antes de que huya!', 3.2);
       G.Audio.sfx('shiny');
       return;

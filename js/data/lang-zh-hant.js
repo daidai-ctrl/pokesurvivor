@@ -432,7 +432,7 @@ if (G.I18n.lang === 'zh-hant') G.I18n.add({
   'Se lanzará a la vez que {x}.': '會與 {x} 同時發動。', '¡Vínculo! {x} movimientos a la vez': '羈絆！同時發動 {x} 個招式',
   'Guardas el vínculo: aprende otro movimiento para usarlo': '你保留了羈絆：學會另一個招式後才能使用。', '¡Se ha abierto una grieta misteriosa!': '神秘裂隙開啟了！',
   'Has entrado en la grieta…': '你進入了裂隙……', 'La grieta os ha expulsado…': '裂隙把你們送了出去……', '{x} ha dejado la partida': '{x} 已離開遊戲',
-  '+1 ticket': '+1 張票券', '¡Ticket ×10!': '×10 票券！', '· ×{x} Fortuna': '· ×{x} 幸運', 'Has caído: un compañero puede levantarte': '你倒下了：夥伴可以扶你起來。',
+  '+1 ticket': '+1 張票券', '¡Ticket morado ×1!': '紫色票券 ×1！', '· ×{x} Fortuna': '· ×{x} 幸運', 'Has caído: un compañero puede levantarte': '你倒下了：夥伴可以扶你起來。',
   'Habéis caído todos…': '你們全部倒下了……', '¡{x} necesita ayuda! · {x} m': '{x} 需要幫助！· {x} 公尺', 'Grieta · {x} m · {x} s': '裂隙 · {x} 公尺 · {x} 秒',
   'DERROTADOS ·': '擊敗數 ·', '{x} · {x} DERROTADOS · {x} MONEDAS': '{x} · 擊敗數 {x} · 金幣 {x}', 'El anfitrión ha terminado la partida': '房主已結束遊戲。',
   'Se ha perdido la conexión con el anfitrión.': '與房主的連線已中斷。', 'movimiento ·': '招式 ·', 'ciclar ·': '切換 ·',
@@ -465,7 +465,7 @@ if (G.I18n.lang === 'zh-hant') G.I18n.add({
   '¡Un {x} se ha perdido! Búscalo y llévalo a la marca': '{x} 迷路了！找到它並帶回標記處。', '¡{x} te sigue! Llévalo a la marca verde': '{x} 正跟著你！把它帶到綠色標記處。',
   '¡{x} se ha asustado y ha huido…!': '{x} 受到驚嚇並逃走了……！', '{x} se ha cansado de esperar y se ha ido…': '{x} 等得不耐煩，已經離開了……',
   '¡Has llevado a {x} a casa! Te lo agradece': '你把 {x} 帶回家了！它向你表示感謝。', '¡{x} se une a tu equipo!': '{x} 加入你的隊伍了！',
-  '¡{x} te da las gracias! (+150 monedas, ya lo tenías)': '{x} 向你道謝！（+150 金幣，你已經擁有它）', '¡Un {x} con un ticket ×10! ¡Atrápalo antes de que huya!': '一隻帶著 ×10 票券的 {x}！在它逃走前抓住它！',
+  '¡{x} te da las gracias! (+150 monedas, ya lo tenías)': '{x} 向你道謝！（+150 金幣，你已經擁有它）', '¡Un {x} con un ticket morado! ¡Atrápalo antes de que huya!': '一隻帶著紫色票券的 {x}！在它逃走前抓住它！',
   '¡{x} se ha enfurecido!': '{x} 暴怒了！', 'Esta partida no cuenta para el ranking: se ha detectado algo raro': '本局不計入排行榜：偵測到異常狀況。',
 
   // ---------------- 補充：收藏、扭蛋、任務與好友 ----------------
@@ -483,7 +483,7 @@ if (G.I18n.lang === 'zh-hant') G.I18n.add({
   'Tienes {x}': '你有 {x}', 'Gen {x}': '第 {x} 世代', 'Probabilidades': '機率', 'Tiradas sin legendaria en {x}: {x} / {x}': '{x} 中未抽到傳說寶可夢的次數：{x}／{x}',
   '· A las {x} tiradas sin Legendaria en un banner, la siguiente lo es.': '· 在同一扭蛋池連續 {x} 次未抽到傳說寶可夢後，下一次必定抽到。',
   '· La tirada ×10 garantiza al menos una Épica.': '· ×10 抽取至少保證一隻史詩寶可夢。', '· Los repetidos dan Pokémonedas. Los shiny no se repiten.': '· 重複寶可夢會轉換成寶可幣，異色寶可夢不會重複。',
-  '· Los tickets se consiguen jugando: algunos Pokémon los sueltan al caer, y los jefes y los legendarios de las grietas, a veces, tickets ×10.': '· 票券可透過遊玩取得：部分寶可夢被擊敗時會掉落票券，首領和裂隙中的傳說寶可夢有時會掉落 ×10 票券。',
+  '· Los tickets se consiguen jugando: algunos Pokémon los sueltan al caer, y los jefes y los legendarios de las grietas, a veces, tickets morados.': '· 票券可透過遊玩取得：部分寶可夢被擊敗時會掉落票券，首領和裂隙中的傳說寶可夢有時會掉落紫色票券。',
   '· {x} {x} shiny': '· {x} {x} 異色', 'Cambia esta misión por otra (una vez al día)': '每天可將此任務更換一次',
   '{x} de {x} logros · títulos: {x}': '成就 {x}／{x} · 稱號：{x}', 'Legendarios vencidos {x} / {x}': '已擊敗傳說寶可夢 {x}／{x}', '· ¡vencido!': '· 已擊敗！',
   'Así te ven los demás jugadores (desde el ranking y la lista de amigos).': '其他玩家會在排行榜和好友列表中看到這些資訊。', 'Tus 3 Pokémon favoritos': '你最喜歡的 3 隻寶可夢',
