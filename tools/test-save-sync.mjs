@@ -132,14 +132,18 @@ const cfDataSource = readFileSync(new URL('../js/net/cf-data.js', import.meta.ur
 const copy = value => JSON.parse(JSON.stringify(value));
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-function browserDevice(server, isNewUser, entries = new Map(), sdkUnavailable = false, firebaseConfig = { apiKey: 'test', projectId: 'test' }) {
+function browserDevice(server, isNewUser, entries = new Map(), sdkUnavailable = false, firebaseConfig = { apiKey: 'test', projectId: 'test' }, options = {}) {
   let nextLoginIsNew = isNewUser;
   const storage = {
     getItem: key => entries.get(key) ?? null,
     setItem: (key, value) => entries.set(key, value),
     removeItem: key => entries.delete(key)
   };
-  const user = { uid, displayName: 'Player', getIdToken: async () => 'token' };
+  const user = {
+    uid, displayName: 'Player',
+    metadata: { creationTime: options.creationTime || '2026-10-14T15:22:00Z' },
+    getIdToken: async () => 'token'
+  };
   const auth = {
     currentUser: null,
     setPersistence: async () => {},
@@ -160,7 +164,11 @@ function browserDevice(server, isNewUser, entries = new Map(), sdkUnavailable = 
   authFactory.GoogleAuthProvider = class {};
   let firestoreReads = 0;
   const firestore = () => ({ collection: () => ({ doc: () => ({
-    async get() { firestoreReads++; throw new Error('Firestore should not be read'); }
+    async get() {
+      firestoreReads++;
+      if (options.firestoreSave) return { exists: true, data: () => ({ save: copy(options.firestoreSave) }) };
+      throw new Error('Firestore should not be read');
+    }
   }) }) });
   const cloud = {
     enabled: () => true,
@@ -174,7 +182,8 @@ function browserDevice(server, isNewUser, entries = new Map(), sdkUnavailable = 
       server.save = copy(save);
       server.version = hash(server.save);
       return { ok: true, version: server.version };
-    }
+    },
+    async putSave(save) { server.save = copy(save); return { ok: true }; }
   };
   const G = {
     FIREBASE_CONFIG: firebaseConfig, I18n: { lang: 'en' }, CFData: cloud,
@@ -249,6 +258,43 @@ test('failed first upload keeps local progress and a second device does not inve
   await second.db.ready();
   assert.equal((await second.db.loginWithGoogle()).ok, false);
   assert.equal(second.db.save, null);
+  assert.equal(second.firestoreReads, 0);
+  assert.equal(server.save, null);
+});
+
+test('an older account with no CF save retains its isolated Firestore migration path', async () => {
+  const server = { save: null, version: null };
+  const legacy = { name: 'Veteran', coins: 321, updated: 100 };
+  const device = browserDevice(server, false, new Map(), false,
+    { apiKey: 'test', projectId: 'test' },
+    { creationTime: '2026-10-13T12:00:00Z', firestoreSave: legacy });
+  await device.db.ready();
+  assert.equal((await device.db.loginWithGoogle()).ok, true);
+  assert.equal(device.firestoreReads, 1);
+  assert.equal(device.db.save.coins, 321);
+  assert.notEqual(device.db.save.syncV, 2);
+});
+
+test('a later login to a new account with no CF save does not consult even an existing Firestore document', async () => {
+  const server = { save: null, version: null };
+  const device = browserDevice(server, false, new Map(), false,
+    { apiKey: 'test', projectId: 'test' },
+    { creationTime: '2026-10-14T15:22:00Z', firestoreSave: { name: 'Wrong copy', coins: 999 } });
+  await device.db.ready();
+  assert.equal((await device.db.loginWithGoogle()).ok, false);
+  assert.equal(device.firestoreReads, 0);
+  assert.equal(device.db.save, null);
+  assert.equal(server.save, null);
+});
+
+test('an unknown account creation time fails closed when CF has no save', async () => {
+  const server = { save: null, version: null };
+  const device = browserDevice(server, false, new Map(), false,
+    { apiKey: 'test', projectId: 'test' },
+    { creationTime: 'invalid', firestoreSave: { name: 'Unknown', coins: 999 } });
+  await device.db.ready();
+  assert.equal((await device.db.loginWithGoogle()).ok, false);
+  assert.equal(device.firestoreReads, 0);
   assert.equal(server.save, null);
 });
 

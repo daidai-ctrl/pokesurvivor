@@ -315,6 +315,11 @@ G.DB = (() => {
   // La copia local se guarda al momento; al ocultar la pestaña se sube lo pendiente.
   const PUSH_GAP = 30 * 60 * 1000, PUSH_GAP_URGENT = 30 * 1000, HIDE_GAP = 10 * 60 * 1000;
   const V2_PUSH_GAP = 10 * 1000, V2_PUSH_URGENT = 2 * 1000;
+  // Safety cutover (2026-10-14 23:21 China time): accounts created from this
+  // point use CF only. Older accounts retain the one-time Firestore migration
+  // path, including those with a local legacy save. An unknown creation time
+  // fails closed rather than guessing that an account is legacy.
+  const CF_FIRST_CREATED_AT = Date.parse('2026-10-14T15:21:00Z');
   let syncState = 'local';           // 'ok' | 'syncing' | 'pending' | 'offline' | 'conflict' | 'local'
   const listeners = new Set();
   const commitListeners = new Set();
@@ -391,6 +396,10 @@ G.DB = (() => {
     if (G.Signups) G.Signups.report(u);          // tope de cuentas del mes (net/signups.js)
     const cached = read(K_CLOUD + uid);
     const meta = read(K_CLOUD_META + uid);
+    const createdAt = Date.parse((u.metadata && u.metadata.creationTime) || '');
+    const legacyAccount = !opts.newAuth &&
+      ((Number.isFinite(createdAt) && createdAt < CF_FIRST_CREATED_AT) ||
+       (cached && cached.syncV !== 2));
     let remote = null, state = null, online = true;
     const cf = G.CFData && G.CFData.enabled();
     if (opts.newAuth && !cf) throw { code: 'cloud_unavailable' };
@@ -404,7 +413,7 @@ G.DB = (() => {
       // Una cuenta aún no migrada se lee una sola vez desde Firestore y se
       // copia al Worker en el primer push posterior. A NEW account must not
       // depend on the exhausted Firestore quota just to create its first save.
-      if (!remote && !opts.newAuth && !(cached && cached.syncV === 2)) {
+      if (!remote && legacyAccount && !(cached && cached.syncV === 2)) {
         legacyRead = true;
         const snap = await docRef().get();
         remote = snap.exists ? snap.data().save : null;
@@ -415,11 +424,17 @@ G.DB = (() => {
       if (!cached && !opts.newAuth) throw e;
       online = false;
     }
-    versioned = !!(opts.newAuth || (remote && remote.syncV === 2) || (cached && cached.syncV === 2));
+    versioned = !!(opts.newAuth || (remote && remote.syncV === 2) ||
+      (cached && cached.syncV === 2) || (!remote && !cached && !legacyAccount));
     cloudVersion = state ? state.version : (meta && meta.version) || null;
     conflict = false;
     if (versioned) {
       if (state && state.protocol !== 2) throw { code: 'cloud_unavailable' };
+      // Only the actual registration flow may create a first save. A later
+      // login on another device must not invent a blank copy if that upload
+      // failed on the original device.
+      if (!remote && !cached && !opts.newAuth)
+        throw { code: online && cf ? 'save_missing' : 'cloud_unavailable' };
       if (remote && remote.syncV !== 2 && !cached) throw { code: 'save_conflict' };
       if (!cf) online = false;
       // Never replace a different cloud copy or silently discard an unsent
