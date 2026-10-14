@@ -9,3 +9,11 @@ routes = [ { pattern = "api.pokesurvivor.xyz", custom_domain = true } ]
 binding = "pokesurvivor_data"
 database_name = "pokesurvivor-data"
 database_id = "2835d689-b29f-4757-bb9d-5fb224016384"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

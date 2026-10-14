@@ -399,7 +399,22 @@ G.Social = (() => {
 
   function memberInfo() {
     const s = G.DB.save;
-    return { name: me.name, dex: s.partner, shiny: !!s.partnerShiny && G.DB.ownsShiny(s.partner), at: ts() };
+    return { name: me.name, dex: s.partner, shiny: !!s.partnerShiny && G.DB.ownsShiny(s.partner), at: G.CFRoom && G.CFRoom.active ? Date.now() : ts() };
+  }
+
+  const cfRooms = () => !!(G.CFRoom && G.CFRoom.enabled && G.CFRoom.enabled());
+
+  function applyCfRoom(state) {
+    if (!state) { closedRoom(); return; }
+    room = {
+      id: state.id,
+      host: state.host,
+      isHost: state.host === uid,
+      members: Array.isArray(state.members) ? state.members : [],
+      open: state.open !== false
+    };
+    writeStatus();
+    emit('room');
   }
 
   /**
@@ -413,6 +428,18 @@ G.Social = (() => {
 
   async function createRoom() {
     if (room) return room;
+    if (cfRooms()) {
+      const id = G.CFRoom.newId();
+      try {
+        const state = await G.CFRoom.open(id, { create: true, member: memberInfo(), onState: applyCfRoom });
+        applyCfRoom(state);
+        G.Analytics.event('room_created', { players: 1, transport: 'cloudflare' });
+        return room;
+      } catch (e) {
+        G.CFRoom.close(false);
+        console.warn('[Social] sala CF, se usa RTDB:', e.message);
+      }
+    }
     rtOn();
     const id = fb.rtdb.ref('rooms').push().key;
     await fb.rtdb.ref('rooms/' + id).set({ host: uid, open: true, at: ts(), m: { [uid]: memberInfo() } });
@@ -424,6 +451,21 @@ G.Social = (() => {
   async function joinRoom(id) {
     if (room && room.id === id) return { ok: true };
     if (room) await leaveRoom();
+    if (cfRooms()) {
+      try {
+        const state = await G.CFRoom.open(id, { create: false, member: memberInfo(), onState: applyCfRoom });
+        applyCfRoom(state);
+        G.Analytics.event('room_joined', { transport: 'cloudflare' });
+        return { ok: true };
+      } catch (e) {
+        G.CFRoom.close(false);
+        const known = { room_not_found: 'Esa sala ya no existe.', room_closed: 'La partida de esa sala ya ha empezado.', room_full: 'La sala está llena (máximo ' + MAX_PLAYERS + ').' };
+        // A room_not_found can be an old RTDB room created by a cached client;
+        // let the legacy path try it so the rollout remains backwards-safe.
+        if (known[e.message] && e.message !== 'room_not_found') return { ok: false, error: known[e.message] };
+        console.warn('[Social] entrada CF, se prueba RTDB:', e.message);
+      }
+    }
     rtOn();
     let open = null, host = null;
     try {
@@ -481,6 +523,7 @@ G.Social = (() => {
   function closedRoom() {
     if (!room) return;
     detachRoom();
+    if (G.CFRoom && G.CFRoom.active) G.CFRoom.close(false);
     room = null;
     retractInvites();
     writeStatus();
@@ -493,10 +536,14 @@ G.Social = (() => {
     const r = room;
     G.Analytics.event('room_left', { role: r.isHost ? 'host' : 'member' });
     detachRoom();
+    const cloudRoom = G.CFRoom && G.CFRoom.active && G.CFRoom.id === r.id;
+    if (cloudRoom) G.CFRoom.close(true);
     room = null;
-    const ref = r.isHost ? fb.rtdb.ref('rooms/' + r.id) : fb.rtdb.ref('rooms/' + r.id + '/m/' + uid);
-    ref.onDisconnect().cancel().catch(() => {});
-    await ref.remove().catch(() => {});
+    if (!cloudRoom) {
+      const ref = r.isHost ? fb.rtdb.ref('rooms/' + r.id) : fb.rtdb.ref('rooms/' + r.id + '/m/' + uid);
+      ref.onDisconnect().cancel().catch(() => {});
+      await ref.remove().catch(() => {});
+    }
     retractInvites();
     writeStatus();
     rtOff();
@@ -505,13 +552,17 @@ G.Social = (() => {
 
   /** El anfitrión cierra la sala a nuevos jugadores al empezar la partida. */
   function setOpen(open) {
-    if (room && room.isHost) fb.rtdb.ref('rooms/' + room.id + '/open').set(!!open).catch(() => {});
+    if (!room || !room.isHost) return;
+    if (G.CFRoom && G.CFRoom.active && G.CFRoom.id === room.id) G.CFRoom.setOpen(!!open);
+    else fb.rtdb.ref('rooms/' + room.id + '/open').set(!!open).catch(() => {});
   }
 
   /** Actualiza tu Pokémon en la sala (si cambias de compañero). */
   function refreshMember() {
-    if (room && me) fb.rtdb.ref('rooms/' + room.id + '/m/' + uid).update(
-      { dex: G.DB.save.partner, shiny: !!G.DB.save.partnerShiny && G.DB.ownsShiny(G.DB.save.partner) }).catch(() => {});
+    if (!room || !me) return;
+    const member = { dex: G.DB.save.partner, shiny: !!G.DB.save.partnerShiny && G.DB.ownsShiny(G.DB.save.partner) };
+    if (G.CFRoom && G.CFRoom.active && G.CFRoom.id === room.id) G.CFRoom.updateMember(member);
+    else fb.rtdb.ref('rooms/' + room.id + '/m/' + uid).update(member).catch(() => {});
   }
 
   // ---------------- invitaciones ----------------

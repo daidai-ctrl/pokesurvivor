@@ -425,12 +425,165 @@ async function handle(req, env, uid, url) {
   return json({ error: 'not found' }, 404);
 }
 
+// ---------------- ephemeral multiplayer rooms ----------------
+
+function roomMember(uid, value) {
+  const v = value && typeof value === 'object' ? value : {};
+  return {
+    uid,
+    name: String(v.name || '').slice(0, 40),
+    dex: Number.isInteger(Number(v.dex)) ? Number(v.dex) : 0,
+    shiny: !!v.shiny,
+    at: Number(v.at) || Date.now(),
+    seen: Date.now()
+  };
+}
+
+export class Room {
+  constructor(state) {
+    this.state = state;
+    this.room = null;
+    this.sockets = new Map();
+    this.ready = state.blockConcurrencyWhile(async () => {
+      this.room = await state.storage.get('room') || null;
+      this.prune(Date.now());
+    });
+  }
+
+  async fetch(req) {
+    await this.ready;
+    if ((req.headers.get('Upgrade') || '').toLowerCase() !== 'websocket') return json({ error: 'websocket required' }, 426);
+    const uid = req.headers.get('X-PS-UID') || '';
+    const roomId = req.headers.get('X-PS-ROOM') || '';
+    if (!uid) return json({ error: 'unauthorized' }, 401);
+    const protocols = (req.headers.get('Sec-WebSocket-Protocol') || '').split(',').map(v => v.trim()).filter(Boolean);
+    const [client, server] = Object.values(new WebSocketPair());
+    const old = this.sockets.get(uid);
+    if (old) { try { old.close(4001, 'replaced'); } catch (e) { /* nada */ } }
+    server.accept();
+    this.sockets.set(uid, server);
+    this.roomId = roomId;
+    server.addEventListener('message', event => this.message(uid, server, event.data).catch(error => {
+      console.error('[room]', error);
+      try { server.send(JSON.stringify({ type: 'error', error: 'room_error' })); } catch (e) { /* nada */ }
+    }));
+    server.addEventListener('close', () => this.disconnect(uid, server).catch(() => {}));
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+      headers: { 'Sec-WebSocket-Protocol': protocols.includes('ps-v1') ? 'ps-v1' : protocols[0] || 'ps-v1' }
+    });
+  }
+
+  prune(now) {
+    if (!this.room) return;
+    for (const [uid, member] of Object.entries(this.room.members || {})) {
+      if (!this.sockets.has(uid) && now - Number(member.seen || 0) > 45000) delete this.room.members[uid];
+    }
+    if (!this.room.members[this.room.host]) this.room = null;
+  }
+
+  async save() {
+    if (this.room) await this.state.storage.put('room', this.room);
+    else await this.state.storage.delete('room');
+  }
+
+  publicRoom() {
+    if (!this.room) return null;
+    const members = Object.values(this.room.members || {}).map(({ seen, ...member }) => member)
+      .sort((a, b) => a.uid === this.room.host ? -1 : b.uid === this.room.host ? 1 : (a.at || 0) - (b.at || 0));
+    return { id: this.room.id, host: this.room.host, open: !!this.room.open, members };
+  }
+
+  send(socket, value) { try { socket.send(JSON.stringify(value)); } catch (e) { /* disconnected */ } }
+
+  broadcast(value, except) {
+    for (const [uid, socket] of this.sockets) if (uid !== except) this.send(socket, value);
+  }
+
+  async message(uid, socket, raw) {
+    let value;
+    try { value = JSON.parse(raw); } catch (e) { return; }
+    if (!value || typeof value.type !== 'string') return;
+    const now = Date.now();
+    this.prune(now);
+    if (value.type === 'join') {
+      if (!this.room) {
+        if (!value.create) return this.send(socket, { type: 'error', error: 'room_not_found' });
+        this.room = { id: this.roomId || uid + '_' + now.toString(36), host: uid, open: true, members: {} };
+      }
+      if (this.room.host !== uid && !this.room.open && !this.room.members[uid]) return this.send(socket, { type: 'error', error: 'room_closed' });
+      if (!this.room.members[uid] && Object.keys(this.room.members).length >= 4) return this.send(socket, { type: 'error', error: 'room_full' });
+      this.room.members[uid] = roomMember(uid, value.member);
+      await this.save();
+      this.broadcast({ type: 'room', room: this.publicRoom() }, uid);
+      this.send(socket, { type: 'room', room: this.publicRoom() });
+      return;
+    }
+    if (!this.room || !this.room.members[uid]) return this.send(socket, { type: 'error', error: 'not_in_room' });
+    if (value.type === 'heartbeat') {
+      this.room.members[uid].seen = now;
+      return;
+    }
+    if (value.type === 'relay') {
+      const target = String(value.to || '');
+      if (target && this.sockets.has(target) && value.env && typeof value.env === 'object') this.send(this.sockets.get(target), { type: 'relay', from: uid, env: value.env });
+      return;
+    }
+    if (value.type === 'set-open') {
+      if (uid !== this.room.host) return;
+      this.room.open = !!value.open;
+      await this.save();
+      this.broadcast({ type: 'room', room: this.publicRoom() });
+      return;
+    }
+    if (value.type === 'member') {
+      const old = this.room.members[uid];
+      this.room.members[uid] = Object.assign(old, roomMember(uid, Object.assign({}, old, value.member || {})), { seen: now });
+      await this.save();
+      this.broadcast({ type: 'room', room: this.publicRoom() });
+      return;
+    }
+    if (value.type === 'leave') return this.disconnect(uid, socket, true);
+  }
+
+  async disconnect(uid, socket, explicit = false) {
+    if (this.sockets.get(uid) !== socket) return;
+    this.sockets.delete(uid);
+    if (!this.room || !this.room.members[uid]) return;
+    if (uid === this.room.host) {
+      this.broadcast({ type: 'closed', reason: explicit ? 'left' : 'host_left' }, uid);
+      for (const other of this.sockets.values()) { try { other.close(4000, 'room closed'); } catch (e) { /* nada */ } }
+      this.sockets.clear(); this.room = null; await this.save(); return;
+    }
+    delete this.room.members[uid];
+    if (!Object.keys(this.room.members).length) { this.room = null; await this.save(); return; }
+    await this.save();
+    this.broadcast({ type: 'room', room: this.publicRoom() });
+  }
+}
+
+function websocketToken(req, url) {
+  const protocols = (req.headers.get('Sec-WebSocket-Protocol') || '').split(',').map(v => v.trim()).filter(Boolean);
+  return protocols[1] || url.searchParams.get('token') || '';
+}
+
 export default {
   async fetch(req, env) {
     const headers = cors(req.headers.get('Origin') || '');
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     const url = new URL(req.url);
     if (url.pathname === '/health') return json({ ok: true, service: 'pokesurvivor-data' }, 200, headers);
+    if (url.pathname === '/v1/room/ws' && (req.headers.get('Upgrade') || '').toLowerCase() === 'websocket') {
+      const roomId = url.searchParams.get('room') || '';
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(roomId)) return json({ error: 'room' }, 400, headers);
+      const uid = await verify(websocketToken(req, url));
+      if (!uid) return json({ error: 'unauthorized' }, 401, headers);
+      const h = new Headers(req.headers);
+      h.set('X-PS-UID', uid); h.set('X-PS-ROOM', roomId);
+      const stub = env.ROOMS.get(env.ROOMS.idFromName(roomId));
+      return stub.fetch(new Request(req, { headers: h }));
+    }
     const uid = await verify((req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
     if (!uid) return json({ error: 'unauthorized' }, 401, headers);
     try {

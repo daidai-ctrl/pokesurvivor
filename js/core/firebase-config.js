@@ -24,6 +24,11 @@ G.FIREBASE_CONFIG = {
 // accounts keep their uid while Firestore data is migrated safely.
 G.FIREBASE_DATA_URL = 'https://api.pokesurvivor.xyz';
 
+// Cloudflare TURN is used for players whose networks cannot establish a
+// direct WebRTC connection. It is optional: the room relay remains available
+// if TURN credentials are not configured yet.
+G.TURN_URL = 'https://turn.pokesurvivor.xyz/';
+
 // PayPal is intentionally a separate Worker. An empty value hides the PayPal
 // button so a half-configured payment path can never be shown to players.
 G.PAYPAL_API_URL = 'https://pokesurvivor-paypal.zzy1848599547.workers.dev';

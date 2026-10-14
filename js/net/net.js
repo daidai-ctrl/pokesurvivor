@@ -26,11 +26,10 @@ G.Net = (() => {
   const DIRECT_TIMEOUT = 9000;     // ms para conseguir canal directo antes de usar el relé
 
   // ---------------- TURN (Cloudflare) ----------------
-  // TURN is deliberately disabled until PokéSurvivor's own Cloudflare
-  // Worker is deployed. This prevents the new Firebase project from sending
-  // tokens to the original project's TURN endpoint; Realtime Database remains
-  // the multiplayer relay fallback for now.
-  const TURN_URL = '';
+  // TURN is optional. If it is unavailable, the Cloudflare room relay below
+  // still carries signaling and fallback game messages; RTDB remains the last
+  // compatibility fallback for rooms created by older clients.
+  const TURN_URL = G.TURN_URL || '';
   let turn = null, turnAt = 0, turnReq = null;
   /** Pide (o reutiliza) credenciales TURN. Nunca falla: sin ellas, se sigue como antes. */
   function fetchTurn() {
@@ -55,6 +54,7 @@ G.Net = (() => {
 
   let rtdb = null, uid = null, roomId = null, isHost = false, hostUid = null;
   let qref = null;
+  let cfOff = null;
   const peers = new Map();         // uid -> { pc, dc, mode, timer }
   const handlers = new Set(), peerHandlers = new Set();
   let stats = { sent: 0, recv: 0, relaySent: 0 };
@@ -73,6 +73,13 @@ G.Net = (() => {
     rtdb = fb.rtdb; uid = fb.uid;
     roomId = id; isHost = host; hostUid = hostId;
     fetchTurn();                    // se piden ya, para tenerlas al conectar
+    if (G.CFRoom && G.CFRoom.active) {
+      cfOff = G.CFRoom.onMessage((from, env) => {
+        if (!env || !env.f) return;
+        if (env.sig) onSignal(env.f, env.sig);
+        else deliver(env.f, env.d);
+      });
+    } else {
     qref = rtdb.ref('rooms/' + id + '/q/' + uid);
     qref.on('child_added', s => {
       const raw = s.val();
@@ -83,6 +90,7 @@ G.Net = (() => {
       if (m.sig) onSignal(m.f, m.sig);
       else deliver(m.f, m.d);
     });
+    }
     // Invitado: hueco para el anfitrión desde ya (se sustituye al llegar su
     // oferta). Así, si no llega nunca, se sigue por el relé y se sabe cuándo se va.
     if (!isHost) {
@@ -94,6 +102,7 @@ G.Net = (() => {
 
   function close() {
     for (const u of [...peers.keys()]) drop(u);
+    if (cfOff) { cfOff(); cfOff = null; }
     if (qref) { qref.off(); qref = null; }
     roomId = null; isHost = false; hostUid = null;
   }
@@ -221,7 +230,12 @@ G.Net = (() => {
   // ---------------- envío / recepción ----------------
 
   function relayPush(to, env) {
-    if (!rtdb || !roomId) return;
+    if (!roomId) return;
+    if (G.CFRoom && G.CFRoom.active) {
+      G.CFRoom.send(to, env);
+      return;
+    }
+    if (!rtdb) return;
     rtdb.ref('rooms/' + roomId + '/q/' + to).push(JSON.stringify(env)).catch(e => console.warn('[Net] relé:', e.code || e.message));
   }
 

@@ -34,7 +34,7 @@
  * puede crear. Protegido con la clave MAU_SECRET (secreto del Worker y de la
  * función), así nadie más puede tocar el contador.
  */
-const PROJECT = 'pokesurvivor-jpter';
+const PROJECT = 'pokesurvivor-xyz';
 const ORIGINS = ['https://pokesurvivor.xyz', 'https://www.pokesurvivor.xyz', 'http://127.0.0.1:8765', 'http://localhost:8765'];
 const TTL = 4 * 3600;                         // segundos que valen las credenciales
 const JWKS = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
