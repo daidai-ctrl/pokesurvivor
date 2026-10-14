@@ -12,9 +12,9 @@ G.GachaUI = (() => {
     'zh-hant': '敬請期待 · 前往 Waffo'
   };
   const PURCHASE_COPY = {
-    es: { product: '10 tickets de gacha', optional: 'Compra opcional · pago único', paypal: 'Pago único · 9,90 USD', paypalTitle: 'PayPal' },
-    en: { product: '10 Gacha Tickets', optional: 'Optional purchase · one-time payment', paypal: 'One-time payment · USD 9.90', paypalTitle: 'PayPal' },
-    'zh-hant': { product: '10 扭蛋票券', optional: '可選購買 · 一次性付款', paypal: '一次性付款 · 9.90 USD', paypalTitle: 'PayPal' }
+    es: { product: '10 tickets de gacha', optional: 'Compra opcional · pago único' },
+    en: { product: '10 Gacha Tickets', optional: 'Optional purchase · one-time payment' },
+    'zh-hant': { product: '10 扭蛋票券', optional: '可選購買 · 一次性付款' }
   };
 
   function purchaseCopy() {
@@ -26,18 +26,11 @@ G.GachaUI = (() => {
     const icon = G.Icons.html('ticket', 18, 'purchase-ticket-icon');
     const price = G.I18n.lang === 'es' ? '9,90 USD' : '9.90 USD';
     const waffo = $('gacha-purchase-card');
-    const paypal = $('paypal-purchase-card');
     if (waffo) {
       const title = waffo.querySelector('b');
       const sub = waffo.querySelector('.sub');
       if (title) title.innerHTML = `${copy.product} ${icon} · ${price}`;
       if (sub) sub.textContent = copy.optional;
-    }
-    if (paypal) {
-      const title = paypal.querySelector('b');
-      const sub = paypal.querySelector('.sub');
-      if (title) title.innerHTML = `${copy.paypalTitle} · ${copy.product} ${icon}`;
-      if (sub) sub.textContent = copy.paypal;
     }
   }
 
@@ -64,7 +57,6 @@ G.GachaUI = (() => {
       });
     }
     updatePurchaseCards();
-    if (G.PayPalUI) G.PayPalUI.init();
 
     const tabs = $('gacha-gens');
     G.Gacha.BANNERS.forEach(b => {

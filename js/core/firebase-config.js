@@ -29,10 +29,6 @@ G.FIREBASE_DATA_URL = 'https://api.pokesurvivor.xyz';
 // if TURN credentials are not configured yet.
 G.TURN_URL = 'https://turn.pokesurvivor.xyz/';
 
-// PayPal is intentionally a separate Worker. An empty value hides the PayPal
-// button so a half-configured payment path can never be shown to players.
-G.PAYPAL_API_URL = 'https://pokesurvivor-paypal.zzy1848599547.workers.dev';
-
 /* Ejemplo de cómo debe quedar:
 G.FIREBASE_CONFIG = {
   apiKey: 'AIza...',
