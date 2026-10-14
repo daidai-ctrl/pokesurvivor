@@ -7,9 +7,9 @@ G.GachaUI = (() => {
   let gen = 1;
   const WAFFO_CHECKOUT_URL = 'https://pancake.waffo.ai/store/poke-earn2tza/product/PROD_4pCwuWsV3A6kPZ871iQvIz?type=onetime&currency=USD';
   const PURCHASE_LABEL = {
-    es: 'Próximamente · Comprar en Waffo',
-    en: 'Coming soon · Buy on Waffo',
-    'zh-hant': '敬請期待 · 前往 Waffo'
+    es: 'Comprar ahora en Waffo',
+    en: 'Buy now on Waffo',
+    'zh-hant': '立即购买'
   };
   const PURCHASE_COPY = {
     es: { product: '10 tickets de gacha', optional: 'Compra opcional · pago único' },
