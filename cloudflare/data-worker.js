@@ -1,3 +1,5 @@
+import { checkoutProduct, WAFFO_STORE_ID, verifyWaffoWebhook, waffoPost } from './waffo.js';
+
 /* PokéSurvivor data API.
  * Firebase Authentication is retained during migration so existing accounts
  * keep the same uid. The Worker verifies the Firebase ID token and uses D1 for
@@ -13,6 +15,7 @@ const JWKS = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@sys
 const TOP = 50;
 const SHARE_CAMPAIGN = 'share_t1_5_v1';
 const SHARE_TICKETS = 5;
+const WAFFO_MAX_BODY = 300000;
 let keys = null, keysAt = 0;
 
 const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), {
@@ -114,6 +117,203 @@ async function savePutV2(env, uid, value, baseVersion) {
       'INSERT OR IGNORE INTO saves(uid, payload, game_updated, updated_at) VALUES(?, ?, ?, ?)'
     ).bind(uid, payload, gameUpdated, now).run();
   return result.meta && result.meta.changes ? await saveVersion(payload, gameUpdated) : null;
+}
+
+function boundedText(value, max = 200) {
+  return String(value == null ? '' : value).slice(0, max);
+}
+
+function waffoMetadata(data) {
+  const metadata = data && data.orderMetadata && typeof data.orderMetadata === 'object'
+    ? data.orderMetadata : {};
+  const quantity = Number(metadata.ticketQuantity);
+  const uid = boundedText(data && data.merchantProvidedBuyerIdentity, 128);
+  const orderId = boundedText(data && data.orderId, 128);
+  const eventUidOk = /^[A-Za-z0-9_.:-]{6,128}$/.test(uid);
+  const quantityOk = quantity === 10 || quantity === 100;
+  const valid = metadata.game === 'pokesurvivor' &&
+    metadata.reward === 'yellow_tickets' && eventUidOk && quantityOk && !!orderId;
+  return { metadata, quantity, uid, orderId, valid };
+}
+
+async function createWaffoCheckout(env, uid, value) {
+  const product = checkoutProduct(value && value.itemId, env);
+  if (!product) return { error: 'invalid_product', status: 400 };
+  const current = await saveState(env, uid);
+  // A purchase is not opened until the CF save exists. This prevents a paid
+  // order from being created for a user whose first save was never confirmed.
+  if (!current.save || current.save.syncV !== 2) return { error: 'save_required', status: 409 };
+
+  const clientRequestId = /^[A-Za-z0-9_-]{8,80}$/.test(String(value && value.requestId || ''))
+    ? String(value.requestId) : crypto.randomUUID();
+  const externalId = `PS:${product.quantity}:${clientRequestId}`.slice(0, 128);
+  const token = await waffoPost(env, '/v1/actions/auth/issue-session-token', {
+    productId: product.productId,
+    buyerIdentity: uid
+  });
+  const session = await waffoPost(env, '/v1/actions/checkout/create-session', {
+    productId: product.productId,
+    currency: 'USD',
+    orderMerchantExternalId: externalId,
+    orderMetadata: {
+      game: 'pokesurvivor',
+      reward: 'yellow_tickets',
+      ticketQuantity: String(product.quantity),
+      clientRequestId
+    }
+  }, `ps-${uid.slice(0, 40)}-${clientRequestId}`.slice(0, 128));
+  if (!token.token || !session.checkoutUrl) throw new Error('waffo_checkout_invalid_response');
+  return { checkoutUrl: `${session.checkoutUrl}#token=${token.token}`, expiresAt: session.expiresAt };
+}
+
+async function rememberWaffoEvent(env, event) {
+  const data = event && event.data || {};
+  const eventId = boundedText(event && event.id, 128);
+  if (!eventId) throw new Error('waffo_event_id_missing');
+  const now = Date.now();
+  const inserted = await env.pokesurvivor_data.prepare(
+    `INSERT OR IGNORE INTO waffo_events
+     (event_id, event_type, order_id, status, uid, tickets_t1, payload, created_at, updated_at)
+     VALUES (?, ?, ?, 'processing', ?, 0, ?, ?, ?)`
+  ).bind(eventId, boundedText(event.eventType, 80), boundedText(data.orderId, 128),
+    boundedText(data.merchantProvidedBuyerIdentity, 128), JSON.stringify(event), now, now).run();
+  if (inserted.meta && inserted.meta.changes) return { fresh: true, eventId };
+  const existing = await env.pokesurvivor_data.prepare(
+    'SELECT status FROM waffo_events WHERE event_id = ?'
+  ).bind(eventId).first();
+  return { fresh: false, eventId, status: existing && existing.status };
+}
+
+async function updateWaffoEvent(env, eventId, status, details = {}) {
+  await env.pokesurvivor_data.prepare(
+    `UPDATE waffo_events SET status = ?, uid = COALESCE(NULLIF(?, ''), uid),
+       tickets_t1 = ?, error = ?, updated_at = ? WHERE event_id = ?`
+  ).bind(status, boundedText(details.uid, 128), Number(details.tickets || 0),
+    boundedText(details.error, 300) || null, Date.now(), eventId).run();
+}
+
+async function grantWaffoPurchase(env, event, info) {
+  const existing = await env.pokesurvivor_data.prepare(
+    'SELECT status FROM waffo_orders WHERE order_id = ?'
+  ).bind(info.orderId).first();
+  if (existing && ['granted', 'refund_review', 'refunded'].includes(existing.status)) {
+    return { status: 'duplicate', tickets: 0 };
+  }
+  if (existing && existing.status === 'processing') throw new Error('waffo_grant_busy');
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const row = await env.pokesurvivor_data.prepare(
+      'SELECT payload, game_updated FROM saves WHERE uid = ?'
+    ).bind(info.uid).first();
+    if (!row) throw new Error('waffo_save_missing');
+    const save = parse(row.payload, null);
+    if (!save || save.syncV !== 2) throw new Error('waffo_save_invalid');
+    save.tickets = Object.assign({ t1: 0, t10: 0 }, save.tickets || {});
+    save.tickets.t1 = Math.max(0, Number(save.tickets.t1) || 0) + info.quantity;
+    const gameUpdated = Math.max(Number(row.game_updated || 0) + 1, Date.now(), Number(save.updated || 0) + 1);
+    save.updated = Math.max(Number(save.updated) || 0, gameUpdated);
+    const payload = JSON.stringify(save);
+    const nonce = crypto.randomUUID();
+    const now = Date.now();
+    try {
+      await env.pokesurvivor_data.batch([
+        env.pokesurvivor_data.prepare(
+          `INSERT OR IGNORE INTO waffo_orders
+           (order_id, event_id, uid, product_id, tickets_t1, status, buyer_email,
+            merchant_external_id, grant_nonce, payload, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?, ?, ?)`
+        ).bind(info.orderId, boundedText(event.id, 128), info.uid,
+          boundedText(info.metadata.productId, 128), info.quantity, boundedText(info.metadata.buyerEmail, 200),
+          boundedText(info.metadata.orderMerchantExternalId, 128), nonce, JSON.stringify(event), now, now),
+        env.pokesurvivor_data.prepare(
+          `UPDATE saves SET payload = ?, game_updated = ?, updated_at = ?
+           WHERE uid = ? AND game_updated = ? AND payload = ?
+             AND EXISTS (SELECT 1 FROM waffo_orders
+                         WHERE order_id = ? AND status = 'processing' AND grant_nonce = ?)`
+        ).bind(payload, gameUpdated, now, info.uid, Number(row.game_updated || 0), row.payload,
+          info.orderId, nonce),
+        // Force the D1 batch to roll back if the compare-and-swap did not win.
+        env.pokesurvivor_data.prepare(
+          `INSERT INTO waffo_grant_guards(id, ok)
+           VALUES (?, CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`
+        ).bind(nonce),
+        env.pokesurvivor_data.prepare(
+          `UPDATE waffo_orders SET status = 'granted', grant_nonce = NULL,
+             granted_at = ?, updated_at = ?
+           WHERE order_id = ? AND status = 'processing' AND grant_nonce = ?`
+        ).bind(now, now, info.orderId, nonce),
+        env.pokesurvivor_data.prepare('DELETE FROM waffo_grant_guards WHERE id = ?').bind(nonce)
+      ]);
+      return { status: 'granted', tickets: info.quantity };
+    } catch (error) {
+      // A concurrent game save is normal; retry against the newest payload.
+      if (attempt < 2) continue;
+      throw error;
+    }
+  }
+  throw new Error('waffo_grant_conflict');
+}
+
+async function processWaffoWebhook(env, event) {
+  const remembered = await rememberWaffoEvent(env, event);
+  if (!remembered.fresh && remembered.status && remembered.status !== 'retry' && remembered.status !== 'processing') {
+    return { ok: true, duplicate: true };
+  }
+  const data = event && event.data || {};
+  if (event.mode !== 'prod' || event.storeId !== WAFFO_STORE_ID) {
+    await updateWaffoEvent(env, remembered.eventId, 'ignored', { error: 'wrong_store_or_environment' });
+    return { ok: true, ignored: true };
+  }
+  if (event.eventType === 'refund.succeeded') {
+    await env.pokesurvivor_data.prepare(
+      `UPDATE waffo_orders SET status = 'refund_review', updated_at = ? WHERE order_id = ?`
+    ).bind(Date.now(), boundedText(data.orderId, 128)).run();
+    await updateWaffoEvent(env, remembered.eventId, 'refund_review', { error: 'refund_requires_manual_review' });
+    return { ok: true, refundReview: true };
+  }
+  if (event.eventType !== 'order.completed') {
+    await updateWaffoEvent(env, remembered.eventId, 'ignored', { error: 'event_not_used' });
+    return { ok: true, ignored: true };
+  }
+
+  const info = waffoMetadata(data);
+  if (!info.valid) {
+    // This includes old public product links that carry no game UID. We keep
+    // the signed event for manual reconciliation instead of guessing an account.
+    await updateWaffoEvent(env, remembered.eventId, 'manual_review', { error: 'order_not_bound_to_game_account' });
+    return { ok: true, manualReview: true };
+  }
+  info.metadata.productId = data.productId || '';
+  info.metadata.buyerEmail = data.buyerEmail || '';
+  info.metadata.orderMerchantExternalId = data.orderMerchantExternalId || '';
+  try {
+    const result = await grantWaffoPurchase(env, event, info);
+    await updateWaffoEvent(env, remembered.eventId, result.status === 'granted' ? 'granted' : 'duplicate', {
+      uid: info.uid, tickets: result.tickets
+    });
+    return { ok: true, [result.status]: true, tickets: result.tickets };
+  } catch (error) {
+    await updateWaffoEvent(env, remembered.eventId, 'retry', { uid: info.uid, error: error.message });
+    throw error;
+  }
+}
+
+async function waffoWebhookRequest(req, env) {
+  const rawBody = await req.text();
+  if (!rawBody || rawBody.length > WAFFO_MAX_BODY) return json({ error: 'invalid_webhook' }, 400);
+  let event;
+  try {
+    event = await verifyWaffoWebhook(rawBody, req.headers.get('X-Waffo-Signature'), env);
+  } catch (error) {
+    console.warn('[waffo-webhook] rejected', error.message);
+    return json({ error: 'invalid_webhook' }, 401);
+  }
+  try {
+    return json(await processWaffoWebhook(env, event));
+  } catch (error) {
+    console.error('[waffo-webhook] retryable error', error);
+    return json({ error: 'temporary_webhook_failure' }, 500);
+  }
 }
 
 async function summary(env, board) {
@@ -274,6 +474,18 @@ async function collections(env, uids) {
 async function handle(req, env, uid, url) {
   const path = url.pathname.replace(/^\/v1\/?/, '').replace(/\/$/, '');
   const method = req.method;
+
+  if (path === 'waffo/checkout' && method === 'POST') {
+    try {
+      const result = await createWaffoCheckout(env, uid, await readBody(req) || {});
+      return json(result, result.status || 200);
+    } catch (error) {
+      console.error('[waffo-checkout]', error);
+      const status = error.code === 'waffo_not_configured' ? 503 :
+        error.code === 'waffo_api_error' ? 502 : 500;
+      return json({ error: error.code || 'checkout_unavailable' }, status);
+    }
+  }
 
   if (path === 'save') {
     if (method === 'GET') return json(await saveState(env, uid));
@@ -658,6 +870,9 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     const url = new URL(req.url);
     if (url.pathname === '/health') return json({ ok: true, service: 'pokesurvivor-data' }, 200, headers);
+    if (url.pathname === '/v1/waffo/webhook' && req.method === 'POST') {
+      return waffoWebhookRequest(req, env);
+    }
     if (url.pathname === '/v1/room/ws' && (req.headers.get('Upgrade') || '').toLowerCase() === 'websocket') {
       const roomId = url.searchParams.get('room') || '';
       if (!/^[A-Za-z0-9_-]{8,64}$/.test(roomId)) return json({ error: 'room' }, 400, headers);

@@ -89,3 +89,45 @@ CREATE TABLE IF NOT EXISTS share_rewards (
   PRIMARY KEY (uid, campaign)
 );
 CREATE INDEX IF NOT EXISTS share_rewards_uid_idx ON share_rewards(uid, campaign);
+
+-- Waffo payment ledger. The order id and event id make fulfillment
+-- idempotent: retries from Waffo can never grant the same purchase twice.
+-- Rows are append/audit records; existing saves are never deleted or replaced.
+CREATE TABLE IF NOT EXISTS waffo_events (
+  event_id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  order_id TEXT,
+  status TEXT NOT NULL,
+  uid TEXT,
+  tickets_t1 INTEGER NOT NULL DEFAULT 0,
+  payload TEXT NOT NULL,
+  error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS waffo_events_order_idx ON waffo_events(order_id);
+
+CREATE TABLE IF NOT EXISTS waffo_orders (
+  order_id TEXT PRIMARY KEY,
+  event_id TEXT,
+  uid TEXT,
+  product_id TEXT,
+  tickets_t1 INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  buyer_email TEXT,
+  merchant_external_id TEXT,
+  grant_nonce TEXT,
+  payload TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  granted_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS waffo_orders_uid_idx ON waffo_orders(uid, status);
+CREATE INDEX IF NOT EXISTS waffo_orders_external_idx ON waffo_orders(merchant_external_id);
+
+-- A failed CAS must abort the whole D1 batch, including its ledger insert.
+-- The CHECK constraint is deliberately used as a transaction guard.
+CREATE TABLE IF NOT EXISTS waffo_grant_guards (
+  id TEXT PRIMARY KEY,
+  ok INTEGER NOT NULL CHECK(ok = 1)
+);

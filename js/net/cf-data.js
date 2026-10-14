@@ -37,6 +37,9 @@ G.CFData = (() => {
     enabled,
     request,
     getSave: async () => (await get('/v1/save')).save || null,
+    createWaffoCheckout: (itemId, requestId) => request('/v1/waffo/checkout', {
+      method: 'POST', body: JSON.stringify({ itemId, requestId })
+    }),
     getSaveState: expectedUid => request('/v1/save', { expectedUid }),
     putSave: (value, expectedUid) => request('/v1/save', { method: 'PUT', body: JSON.stringify({ save: value }), expectedUid }),
     putSaveState: (value, baseVersion, expectedUid) => request('/v1/save', { method: 'PUT', body: JSON.stringify({ save: value, baseVersion }), expectedUid }),

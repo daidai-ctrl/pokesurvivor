@@ -4,6 +4,7 @@
 G.GachaUI = (() => {
   const $ = G.UI.$;
   let busy = false;
+  let purchaseBusy = false;
   let gen = 1;
   const PURCHASES = [
     {
@@ -54,6 +55,43 @@ G.GachaUI = (() => {
     }
   }
 
+  async function startPurchase(product) {
+    if (purchaseBusy) return;
+    if (!G.DB || G.DB.guest || !G.DB.fb || !G.DB.fb.auth || !G.DB.fb.auth.currentUser) {
+      G.UI.toast(G.I18n.lang === 'zh-hant'
+        ? '請先登入帳號，付款後票券才能安全發送到你的存檔。'
+        : G.I18n.lang === 'en'
+          ? 'Please log in first so the tickets can be delivered safely to your save.'
+          : 'Inicia sesión primero para recibir los tickets en tu partida.');
+      return;
+    }
+    const tab = window.open('about:blank', '_blank', 'noopener,noreferrer');
+    purchaseBusy = true;
+    try {
+      const requestId = crypto.randomUUID();
+      const result = await G.CFData.createWaffoCheckout(product.itemId, requestId);
+      if (!result || !result.checkoutUrl) throw new Error('checkout_unavailable');
+      G.Analytics.event('begin_checkout', {
+        payment_method: 'waffo',
+        item_id: product.itemId,
+        value: product.value,
+        currency: 'USD',
+        quantity: product.quantity
+      });
+      if (tab && !tab.closed) tab.location.replace(result.checkoutUrl);
+      else window.location.assign(result.checkoutUrl);
+    } catch (error) {
+      if (tab && !tab.closed) tab.close();
+      const msg = error && error.code === 'save_required'
+        ? (G.I18n.lang === 'zh-hant' ? '請先完成雲端存檔，再進行付款。' : 'Confirma primero tu partida en la nube.')
+        : (G.I18n.lang === 'zh-hant' ? '付款頁面暫時無法開啟，請稍後再試。' : 'No se pudo abrir el pago. Inténtalo de nuevo más tarde.');
+      G.UI.toast(msg, 4200);
+      console.warn('[Waffo] checkout unavailable:', error);
+    } finally {
+      purchaseBusy = false;
+    }
+  }
+
   function init() {
     $('pull-1').onclick = () => pull(1);
     $('pull-10').onclick = () => pull(10, 't1');
@@ -62,20 +100,14 @@ G.GachaUI = (() => {
     for (const product of PURCHASES) {
       const purchase = $(product.buttonId);
       if (!purchase) continue;
-      purchase.href = product.url;
+      // Do not expose a public product link: it has no Firebase UID binding,
+      // so a successful payment could not be delivered to the right save.
+      purchase.removeAttribute('href');
+      purchase.removeAttribute('target');
+      purchase.setAttribute('role', 'button');
       purchase.textContent = product.label[G.I18n.lang] || product.label.es;
       purchase.title = purchase.textContent;
-      purchase.addEventListener('click', () => {
-        // Waffo hosts the checkout, so this is intentionally only a checkout
-        // start event; the game must never treat a click as a paid order.
-        G.Analytics.event('begin_checkout', {
-          payment_method: 'waffo',
-          item_id: product.itemId,
-          value: product.value,
-          currency: 'USD',
-          quantity: product.quantity
-        });
-      });
+      purchase.addEventListener('click', event => { event.preventDefault(); startPurchase(product); });
     }
     updatePurchaseCards();
 

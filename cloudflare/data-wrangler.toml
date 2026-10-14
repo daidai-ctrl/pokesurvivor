@@ -3,7 +3,11 @@ main = "data-worker.js"
 compatibility_date = "2026-10-01"
 workers_dev = true
 preview_urls = false
+keep_vars = true            # preserve production variables/secrets configured in Cloudflare
 routes = [ { pattern = "api.pokesurvivor.xyz", custom_domain = true } ]
+
+[vars]
+WAFFO_MERCHANT_ID = "MER_7P59j8e11Q5cJDlghRAyKm"
 
 [[d1_databases]]
 binding = "pokesurvivor_data"
