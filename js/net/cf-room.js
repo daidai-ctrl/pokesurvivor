@@ -55,18 +55,25 @@ G.CFRoom = (() => {
         reject(error instanceof Error ? error : new Error(String(error || 'room_error')));
       };
       try {
-        // The Firebase token is sent as a WebSocket subprotocol rather than a
-        // URL query parameter, so it does not appear in normal URL logs.
-        socket = new WebSocket(wsUrl(roomId), ['ps-v1', token]);
+        // Authenticate inside the encrypted WebSocket instead of putting the
+        // Firebase token in the URL or negotiated subprotocol.
+        socket = new WebSocket(wsUrl(roomId), ['ps-v1']);
       } catch (e) { fail(e); return; }
       socket.onopen = () => {
-        send({ type: 'join', create: !!options.create, member: options.member || {} });
-        heartbeat = setInterval(() => send({ type: 'heartbeat' }), 15000);
+        send({ type: 'auth', token });
       };
       socket.onmessage = event => {
         let message;
         try { message = JSON.parse(event.data); } catch (e) { return; }
         if (!message) return;
+        if (message.type === 'auth') {
+          if (!message.ok) { if (!settled) fail(new Error(message.error || 'unauthorized')); }
+          else {
+            send({ type: 'join', create: !!options.create, member: options.member || {} });
+            heartbeat = setInterval(() => send({ type: 'heartbeat' }), 15000);
+          }
+          return;
+        }
         if (message.type === 'room' && message.room) {
           active = true;
           if (openTimer) { clearTimeout(openTimer); openTimer = 0; }

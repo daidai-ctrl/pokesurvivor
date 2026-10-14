@@ -444,6 +444,8 @@ export class Room {
     this.state = state;
     this.room = null;
     this.sockets = new Map();
+    this.socketUids = new Map();
+    this.pending = new Set();
     this.ready = state.blockConcurrencyWhile(async () => {
       this.room = await state.storage.get('room') || null;
       this.prune(Date.now());
@@ -455,19 +457,21 @@ export class Room {
     if ((req.headers.get('Upgrade') || '').toLowerCase() !== 'websocket') return json({ error: 'websocket required' }, 426);
     const uid = req.headers.get('X-PS-UID') || '';
     const roomId = req.headers.get('X-PS-ROOM') || '';
-    if (!uid) return json({ error: 'unauthorized' }, 401);
     const protocols = (req.headers.get('Sec-WebSocket-Protocol') || '').split(',').map(v => v.trim()).filter(Boolean);
     const [client, server] = Object.values(new WebSocketPair());
-    const old = this.sockets.get(uid);
-    if (old) { try { old.close(4001, 'replaced'); } catch (e) { /* nada */ } }
     server.accept();
-    this.sockets.set(uid, server);
+    if (uid) {
+      const old = this.sockets.get(uid);
+      if (old) { this.socketUids.delete(old); try { old.close(4001, 'replaced'); } catch (e) { /* nada */ } }
+      this.sockets.set(uid, server);
+      this.socketUids.set(server, uid);
+    } else this.pending.add(server);
     this.roomId = roomId;
-    server.addEventListener('message', event => this.message(uid, server, event.data).catch(error => {
+    server.addEventListener('message', event => this.message(server, event.data).catch(error => {
       console.error('[room]', error);
       try { server.send(JSON.stringify({ type: 'error', error: 'room_error' })); } catch (e) { /* nada */ }
     }));
-    server.addEventListener('close', () => this.disconnect(uid, server).catch(() => {}));
+    server.addEventListener('close', () => this.disconnectSocket(server).catch(() => {}));
     return new Response(null, {
       status: 101,
       webSocket: client,
@@ -501,10 +505,34 @@ export class Room {
     for (const [uid, socket] of this.sockets) if (uid !== except) this.send(socket, value);
   }
 
-  async message(uid, socket, raw) {
+  async message(socket, raw) {
     let value;
     try { value = JSON.parse(raw); } catch (e) { return; }
     if (!value || typeof value.type !== 'string') return;
+    let uid = this.socketUids.get(socket) || '';
+    if (!uid) {
+      if (value.type !== 'auth' || typeof value.token !== 'string') {
+        this.send(socket, { type: 'auth', ok: false, error: 'unauthorized' });
+        try { socket.close(4003, 'unauthorized'); } catch (e) { /* nada */ }
+        return;
+      }
+      uid = await verify(value.token);
+      if (!uid) {
+        this.send(socket, { type: 'auth', ok: false, error: 'unauthorized' });
+        try { socket.close(4003, 'unauthorized'); } catch (e) { /* nada */ }
+        return;
+      }
+      const old = this.sockets.get(uid);
+      if (old && old !== socket) {
+        this.socketUids.delete(old);
+        try { old.close(4001, 'replaced'); } catch (e) { /* nada */ }
+      }
+      this.pending.delete(socket);
+      this.sockets.set(uid, socket);
+      this.socketUids.set(socket, uid);
+      this.send(socket, { type: 'auth', ok: true });
+      return;
+    }
     const now = Date.now();
     this.prune(now);
     if (value.type === 'join') {
@@ -548,8 +576,9 @@ export class Room {
   }
 
   async disconnect(uid, socket, explicit = false) {
-    if (this.sockets.get(uid) !== socket) return;
+    if (this.sockets.get(uid) !== socket) { this.socketUids.delete(socket); return; }
     this.sockets.delete(uid);
+    this.socketUids.delete(socket);
     if (!this.room || !this.room.members[uid]) return;
     if (uid === this.room.host) {
       this.broadcast({ type: 'closed', reason: explicit ? 'left' : 'host_left' }, uid);
@@ -560,6 +589,13 @@ export class Room {
     if (!Object.keys(this.room.members).length) { this.room = null; await this.save(); return; }
     await this.save();
     this.broadcast({ type: 'room', room: this.publicRoom() });
+  }
+
+  async disconnectSocket(socket, explicit = false) {
+    this.pending.delete(socket);
+    const uid = this.socketUids.get(socket);
+    if (!uid) return;
+    return this.disconnect(uid, socket, explicit);
   }
 }
 
@@ -577,8 +613,9 @@ export default {
     if (url.pathname === '/v1/room/ws' && (req.headers.get('Upgrade') || '').toLowerCase() === 'websocket') {
       const roomId = url.searchParams.get('room') || '';
       if (!/^[A-Za-z0-9_-]{8,64}$/.test(roomId)) return json({ error: 'room' }, 400, headers);
-      const uid = await verify(websocketToken(req, url));
-      if (!uid) return json({ error: 'unauthorized' }, 401, headers);
+      const token = websocketToken(req, url);
+      const uid = token ? await verify(token) : '';
+      if (token && !uid) return json({ error: 'unauthorized' }, 401, headers);
       const h = new Headers(req.headers);
       h.set('X-PS-UID', uid); h.set('X-PS-ROOM', roomId);
       const stub = env.ROOMS.get(env.ROOMS.idFromName(roomId));
