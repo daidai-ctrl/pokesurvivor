@@ -5,30 +5,50 @@ G.GachaUI = (() => {
   const $ = G.UI.$;
   let busy = false;
   let gen = 1;
-  const WAFFO_CHECKOUT_URL = 'https://pancake.waffo.ai/store/poke-earn2tza/product/PROD_4pCwuWsV3A6kPZ871iQvIz?type=onetime&currency=USD';
-  const PURCHASE_LABEL = {
-    es: 'Comprar ahora en Waffo',
-    en: 'Buy now on Waffo',
-    'zh-hant': '立即购买'
-  };
-  const PURCHASE_COPY = {
-    es: { product: '10 tickets de gacha', optional: 'Compra opcional · pago único' },
-    en: { product: '10 Gacha Tickets', optional: 'Optional purchase · one-time payment' },
-    'zh-hant': { product: '10 扭蛋票券', optional: '可選購買 · 一次性付款' }
-  };
+  const PURCHASES = [
+    {
+      cardId: 'gacha-purchase-card',
+      buttonId: 'gacha-purchase',
+      itemId: 'tickets10',
+      url: 'https://pancake.waffo.ai/store/poke-earn2tza/product/PROD_4pCwuWsV3A6kPZ871iQvIz?type=onetime&currency=USD',
+      quantity: 10,
+      value: 9.9,
+      label: { es: 'Comprar ahora en Waffo', en: 'Buy now on Waffo', 'zh-hant': '立即购买' },
+      copy: {
+        es: { product: '10 tickets de gacha', optional: 'Compra opcional · pago único' },
+        en: { product: '10 Gacha Tickets', optional: 'Optional purchase · one-time payment' },
+        'zh-hant': { product: '10 扭蛋票券', optional: '可選購買 · 一次性付款' }
+      }
+    },
+    {
+      cardId: 'gacha-purchase-card-100',
+      buttonId: 'gacha-purchase-100',
+      itemId: 'tickets100',
+      url: 'https://pancake.waffo.ai/store/poke-earn2tza/product/PROD_3XhWBmesENPBvQUwIbaErR?type=onetime&currency=USD',
+      quantity: 100,
+      value: 79,
+      label: { es: 'Comprar ahora en Waffo', en: 'Buy now on Waffo', 'zh-hant': '立即购买' },
+      copy: {
+        es: { product: '100 tickets de gacha', optional: 'Compra opcional · pago único' },
+        en: { product: '100 Gacha Tickets', optional: 'Optional purchase · one-time payment' },
+        'zh-hant': { product: '100 扭蛋票券', optional: '可選購買 · 一次性付款' }
+      }
+    }
+  ];
 
-  function purchaseCopy() {
-    return PURCHASE_COPY[G.I18n.lang] || PURCHASE_COPY.es;
+  function purchaseCopy(product = PURCHASES[0]) {
+    return product.copy[G.I18n.lang] || product.copy.es;
   }
 
   function updatePurchaseCards() {
-    const copy = purchaseCopy();
-    const icon = G.Icons.html('ticket', 18, 'purchase-ticket-icon');
-    const price = G.I18n.lang === 'es' ? '9,90 USD' : '9.90 USD';
-    const waffo = $('gacha-purchase-card');
-    if (waffo) {
-      const title = waffo.querySelector('b');
-      const sub = waffo.querySelector('.sub');
+    for (const product of PURCHASES) {
+      const copy = purchaseCopy(product);
+      const icon = G.Icons.html('ticket', 18, 'purchase-ticket-icon');
+      const price = G.I18n.lang === 'es' ? `${product.value.toFixed(2).replace('.', ',')} USD` : `${product.value.toFixed(2)} USD`;
+      const card = $(product.cardId);
+      if (!card) continue;
+      const title = card.querySelector('b');
+      const sub = card.querySelector('.sub');
       if (title) title.innerHTML = `${copy.product} ${icon} · ${price}`;
       if (sub) sub.textContent = copy.optional;
     }
@@ -39,20 +59,21 @@ G.GachaUI = (() => {
     $('pull-10').onclick = () => pull(10, 't1');
     $('pull-10b').onclick = () => pull(10, 't10');
     $('pull-close').onclick = close;
-    const purchase = $('gacha-purchase');
-    if (purchase) {
-      purchase.href = WAFFO_CHECKOUT_URL;
-      purchase.textContent = PURCHASE_LABEL[G.I18n.lang] || PURCHASE_LABEL.es;
-      purchase.title = PURCHASE_LABEL[G.I18n.lang] || PURCHASE_LABEL.es;
+    for (const product of PURCHASES) {
+      const purchase = $(product.buttonId);
+      if (!purchase) continue;
+      purchase.href = product.url;
+      purchase.textContent = product.label[G.I18n.lang] || product.label.es;
+      purchase.title = purchase.textContent;
       purchase.addEventListener('click', () => {
         // Waffo hosts the checkout, so this is intentionally only a checkout
         // start event; the game must never treat a click as a paid order.
         G.Analytics.event('begin_checkout', {
           payment_method: 'waffo',
-          item_id: 'tickets10',
-          value: 9.9,
+          item_id: product.itemId,
+          value: product.value,
           currency: 'USD',
-          quantity: 10
+          quantity: product.quantity
         });
       });
     }

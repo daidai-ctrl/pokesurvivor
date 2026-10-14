@@ -227,9 +227,11 @@ label { display: block; font-size: 14px; color: var(--muted); margin: 8px 0 4px;
 .panel {
   background: rgba(0,0,0,.2); border: 2px solid rgba(244,248,255,.2); border-radius: 10px; padding: 14px;
 }
+.purchase-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .purchase-card { margin-top: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .purchase-card b .purchase-ticket-icon { vertical-align: middle; margin-left: 3px; }
 .purchase-card .sub { margin: 0; flex: 1 1 100%; }
+@media (max-width: 700px) { .purchase-options { grid-template-columns: 1fr; } }
 .stat { display: grid; grid-template-columns: 90px 1fr 34px; gap: 8px; align-items: center; font-size: 14px; margin: 5px 0; }
 .stat .bar { height: 8px; background: rgba(0,0,0,.35); border-radius: 6px; overflow: hidden; }
 .stat .bar i { display: block; height: 100%; background: var(--gold); }
