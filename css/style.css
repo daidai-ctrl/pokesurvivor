@@ -534,6 +534,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .sync.ok { background: #5fe08a; }
 .sync.syncing, .sync.pending { background: #ffd23f; }
 .sync.offline { background: #ff5f6d; }
+.sync.conflict { background: #ff5f6d; box-shadow: 0 0 0 2px #ffd23f; }
 .sync.local { background: #9fb1c9; }
 .sync.guest { display: none; }
 .legal-link { color: var(--muted); }

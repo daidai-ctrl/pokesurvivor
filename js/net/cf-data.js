@@ -12,12 +12,18 @@ G.CFData = (() => {
 
   async function request(path, options = {}) {
     if (!enabled()) { const e = new Error('Cloudflare data API is not ready'); e.code = 'cf-not-ready'; throw e; }
-    const token = await G.DB.fb.auth.currentUser.getIdToken();
+    const currentUser = G.DB.fb.auth.currentUser;
+    if (options.expectedUid && currentUser.uid !== options.expectedUid) {
+      const e = new Error('Firebase identity changed before the save request');
+      e.code = 'identity_changed'; throw e;
+    }
+    const token = await currentUser.getIdToken();
     const headers = Object.assign({ Authorization: 'Bearer ' + token, 'content-type': 'application/json' }, options.headers || {});
-    const r = await fetch(base() + path, Object.assign({}, options, { headers }));
+    const { expectedUid, ...fetchOptions } = options;
+    const r = await fetch(base() + path, Object.assign({}, fetchOptions, { headers }));
     let data = null;
     try { data = await r.json(); } catch (e) { /* empty response */ }
-    if (!r.ok) { const e = new Error((data && data.error) || ('Cloudflare data API ' + r.status)); e.code = (data && data.error) || ('http-' + r.status); throw e; }
+    if (!r.ok) { const e = new Error((data && data.error) || ('Cloudflare data API ' + r.status)); e.code = (data && data.error) || ('http-' + r.status); e.status = r.status; throw e; }
     return data || {};
   }
 
@@ -31,7 +37,9 @@ G.CFData = (() => {
     enabled,
     request,
     getSave: async () => (await get('/v1/save')).save || null,
-    putSave: value => put('/v1/save', { save: value }),
+    getSaveState: expectedUid => request('/v1/save', { expectedUid }),
+    putSave: (value, expectedUid) => request('/v1/save', { method: 'PUT', body: JSON.stringify({ save: value }), expectedUid }),
+    putSaveState: (value, baseVersion, expectedUid) => request('/v1/save', { method: 'PUT', body: JSON.stringify({ save: value, baseVersion }), expectedUid }),
     deleteSave: () => del('/v1/save'),
     putRun: value => put('/v1/run', value),
     deleteRun: () => del('/v1/run'),

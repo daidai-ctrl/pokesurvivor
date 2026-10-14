@@ -150,8 +150,11 @@ G.SettingsUI = (() => {
 
   function renderAccount(box) {
     const st = G.DB.guest ? 'guest' : G.DB.syncState;
-    const SYNC = { ok: 'Guardado en la nube', syncing: 'Guardando…', pending: 'Pendiente de subir (se sube al salir del juego)',
-                   offline: 'Sin conexión: se subirá al volver', local: 'Guardado sólo en este navegador', guest: 'Invitado: no se guarda' };
+    const SYNC = { ok: 'Guardado en la nube', syncing: 'Guardando…',
+                   pending: 'Pendiente de subir: espera a que termine antes de cambiar de dispositivo.',
+                   offline: 'Sin conexión: se subirá al volver',
+                   conflict: 'Conflicto de guardado: no borres los datos de este navegador y contacta con soporte.',
+                   local: 'Guardado sólo en este navegador', guest: 'Invitado: no se guarda' };
     if (G.DB.guest) {
       box.innerHTML = section('Cuenta', 'Estás jugando como <b>invitado</b>: tu progreso no se guarda al salir.')
         + `<button class="btn gold" id="set-login">Crear cuenta o entrar</button>`;

@@ -66,14 +66,54 @@ async function saveGet(env, uid) {
   return row ? parse(row.payload, null) : null;
 }
 
+async function saveVersion(payload, gameUpdated) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(gameUpdated + ':' + payload));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function saveState(env, uid) {
+  const row = await env.pokesurvivor_data.prepare('SELECT payload, game_updated FROM saves WHERE uid = ?').bind(uid).first();
+  if (!row) return { save: null, version: null, protocol: 2 };
+  const save = parse(row.payload, null);
+  return { save, version: save && save.syncV === 2 ? await saveVersion(row.payload, row.game_updated) : null, protocol: 2 };
+}
+
 async function savePut(env, uid, value) {
+  // Old clients must never replace a versioned save without an expected version.
+  const existing = await env.pokesurvivor_data.prepare('SELECT payload FROM saves WHERE uid = ?').bind(uid).first();
+  if (existing && parse(existing.payload, {}).syncV === 2) return false;
   const now = Date.now();
   const gameUpdated = Math.floor(Number(value && value.updated) || 0);
-  await env.pokesurvivor_data.prepare(
+  const result = await env.pokesurvivor_data.prepare(
     `INSERT INTO saves(uid, payload, game_updated, updated_at) VALUES(?, ?, ?, ?)
      ON CONFLICT(uid) DO UPDATE SET payload=excluded.payload, game_updated=excluded.game_updated, updated_at=excluded.updated_at
-     WHERE excluded.game_updated >= saves.game_updated`
+     WHERE excluded.game_updated >= saves.game_updated
+       AND COALESCE(json_extract(saves.payload, '$.syncV'), 0) != 2`
   ).bind(uid, JSON.stringify(value || {}), gameUpdated, now).run();
+  return !!(result.meta && result.meta.changes);
+}
+
+async function savePutV2(env, uid, value, baseVersion) {
+  const row = await env.pokesurvivor_data.prepare('SELECT payload, game_updated FROM saves WHERE uid = ?').bind(uid).first();
+  if (row) {
+    const current = parse(row.payload, null);
+    if (!current || current.syncV !== 2 || baseVersion !== await saveVersion(row.payload, row.game_updated)) return null;
+  } else if (baseVersion !== null) return null;
+
+  const payload = JSON.stringify(value);
+  if (row && payload === row.payload) return await saveVersion(payload, row.game_updated);
+  const now = Date.now();
+  // Client clocks are not a concurrency primitive. Keep the legacy column
+  // monotonic for the payment/reward writers, but use the payload CAS below.
+  const gameUpdated = Math.max(now, Number(row && row.game_updated || 0) + 1);
+  const result = row
+    ? await env.pokesurvivor_data.prepare(
+      'UPDATE saves SET payload = ?, game_updated = ?, updated_at = ? WHERE uid = ? AND game_updated = ? AND payload = ?'
+    ).bind(payload, gameUpdated, now, uid, row.game_updated, row.payload).run()
+    : await env.pokesurvivor_data.prepare(
+      'INSERT OR IGNORE INTO saves(uid, payload, game_updated, updated_at) VALUES(?, ?, ?, ?)'
+    ).bind(uid, payload, gameUpdated, now).run();
+  return result.meta && result.meta.changes ? await saveVersion(payload, gameUpdated) : null;
 }
 
 async function summary(env, board) {
@@ -180,11 +220,12 @@ async function claimShareReward(env, uid, value) {
       if (!save || typeof save !== 'object') return { error: 'save_invalid', status: 409 };
       save.tickets = save.tickets || { t1: 0, t10: 0 };
       save.tickets.t1 = Math.max(0, Number(save.tickets.t1) || 0) + SHARE_TICKETS;
-      save.updated = Math.max(Number(save.updated) || 0, Date.now());
+      const gameUpdated = Math.max(Number(row.game_updated || 0) + 1, Date.now());
+      save.updated = Math.max(Number(save.updated) || 0, gameUpdated);
       const result = await env.pokesurvivor_data.prepare(
         `UPDATE saves SET payload = ?, game_updated = ?, updated_at = ?
          WHERE uid = ? AND game_updated = ?`
-      ).bind(JSON.stringify(save), Math.floor(save.updated), Date.now(), uid, Number(row.game_updated || 0)).run();
+      ).bind(JSON.stringify(save), gameUpdated, Date.now(), uid, Number(row.game_updated || 0)).run();
       if (result.meta && result.meta.changes) {
         await env.pokesurvivor_data.prepare(
           `UPDATE share_rewards SET status = 'claimed', claimed_at = ?
@@ -235,11 +276,18 @@ async function handle(req, env, uid, url) {
   const method = req.method;
 
   if (path === 'save') {
-    if (method === 'GET') return json({ save: await saveGet(env, uid) });
+    if (method === 'GET') return json(await saveState(env, uid));
     if (method === 'PUT') {
       const value = await readBody(req);
       if (!value || !value.save || JSON.stringify(value.save).length > 900000) return json({ error: 'invalid save' }, 400);
-      await savePut(env, uid, value.save); return json({ ok: true });
+      if (value.save.syncV === 2) {
+        if (!Object.hasOwn(value, 'baseVersion') ||
+            !(value.baseVersion === null || /^[a-f0-9]{64}$/.test(value.baseVersion)))
+          return json({ error: 'version_required' }, 400);
+        const version = await savePutV2(env, uid, value.save, value.baseVersion);
+        return version ? json({ ok: true, version }) : json({ error: 'save_conflict' }, 409);
+      }
+      return await savePut(env, uid, value.save) ? json({ ok: true }) : json({ error: 'save_conflict' }, 409);
     }
     if (method === 'DELETE') {
       await env.pokesurvivor_data.prepare('DELETE FROM saves WHERE uid = ?').bind(uid).run(); return json({ ok: true });

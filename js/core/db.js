@@ -1,19 +1,18 @@
-/* ============ db.js — base de datos: Firebase (nube) o local ============
+/* ============ db.js — identidad Firebase, partidas D1 y modo local ============
  * TODO el acceso a datos persistentes pasa por aquí. El resto del juego sólo
  * usa G.DB.*.
  *
  * Dos modos (se decide en ready()):
  *
- *   NUBE  (Firebase Authentication + Cloud Firestore)
+ *   NUBE  (Firebase Authentication + Cloudflare D1; Firestore para cuentas antiguas)
  *     Si hay configuración en js/core/firebase-config.js y el juego se abre
  *     desde una web (http/https, también localhost). La partida se guarda en
- *     saves/{uid} y se puede seguir en cualquier ordenador.
+ *     D1 saves/{uid} y se puede seguir en cualquier ordenador.
  *       - Usuario + contraseña: Firebase pide un email, así que el nombre se
  *         convierte en uno interno (nunca se le envía nada).
  *       - Cuenta de Google.
- *     Además se guarda una copia local para poder jugar sin conexión; al
- *     sincronizar se FUSIONA (ver merge): las colecciones se unen y nunca se
- *     pierde un Pokémon ni un shiny.
+ *     Además se guarda una copia local. Las cuentas antiguas aún se fusionan
+ *     durante la migración; las nuevas usan versiones y rechazan conflictos.
  *
  *   LOCAL (localStorage)
  *     Si no hay configuración o se abre con doble clic (file://). Igual que
@@ -26,7 +25,7 @@
  */
 G.DB = (() => {
   const K_ACC = 'ps.accounts', K_SES = 'ps.session', K_SAVE = 'ps.save.';
-  const K_CLOUD = 'ps.cloud.', K_MIGRATED = 'ps.migrated.';
+  const K_CLOUD = 'ps.cloud.', K_CLOUD_META = 'ps.cloud.meta.', K_MIGRATED = 'ps.migrated.';
   const VERSION = 3;
   const START_COINS = 500;
   // Keep the compat SDK on a known, widely mirrored version. A failed CDN
@@ -308,16 +307,26 @@ G.DB = (() => {
 
   let auth = null, fs = null, rtdb = null, uid = null, unlisten = null;
   let pushT = 0, retryT = 0, pending = false, pushing = null, lastPush = 0;
-  // Como mucho una subida cada 30 min (con miles de jugadores, cada 5 min
+  let versioned = false, cloudVersion = null, conflict = false;
+  // Cuentas antiguas: como mucho una subida cada 30 min (con miles de jugadores, cada 5 min
   // eran decenas de miles de escrituras por hora); lo que cuesta algo
-  // (gacha, mejoras), a los 30 s. La copia local se guarda siempre al momento (y se fusiona con la
-  // nube al volver a entrar), y al ocultar o cerrar la pestaña se sube lo pendiente.
+  // (gacha, mejoras), a los 30 s. Las cuentas nuevas usan el intervalo v2.
+  // La copia local se guarda al momento; al ocultar la pestaña se sube lo pendiente.
   const PUSH_GAP = 30 * 60 * 1000, PUSH_GAP_URGENT = 30 * 1000, HIDE_GAP = 10 * 60 * 1000;
-  let syncState = 'local';           // 'ok' | 'syncing' | 'pending' | 'offline' | 'local'
+  const V2_PUSH_GAP = 10 * 1000, V2_PUSH_URGENT = 2 * 1000;
+  let syncState = 'local';           // 'ok' | 'syncing' | 'pending' | 'offline' | 'conflict' | 'local'
   const listeners = new Set();
   const commitListeners = new Set();
 
-  function setSync(s) { syncState = s; listeners.forEach(fn => { try { fn(s); } catch (e) { /* nada */ } }); }
+  function setSync(s) {
+    const previous = syncState;
+    syncState = s;
+    listeners.forEach(fn => { try { fn(s); } catch (e) { /* nada */ } });
+    if (s === 'conflict' && previous !== s && G.UI && G.UI.toast)
+      G.UI.toast(G.T('Conflicto de guardado: conserva los datos de este navegador y contacta con soporte.'), 8000);
+    if (s === 'offline' && previous !== s && versioned && G.UI && G.UI.toast)
+      G.UI.toast(G.T('Sin conexión: conserva los datos de este navegador hasta que se confirme el guardado en la nube.'), 8000);
+  }
 
   function loadScript(src) {
     return new Promise((res, rej) => {
@@ -349,13 +358,13 @@ G.DB = (() => {
     }
     await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     auth.languageCode = G.I18n.lang === 'en' ? 'en' : (G.I18n.lang === 'zh-hant' ? 'zh-TW' : 'es');
-    addEventListener('online', () => { if (pending) pushNow(); });
+    addEventListener('online', () => { if (pending && !conflict) pushNow(); });
     // Al salir de la pestaña o cerrarla se sube lo pendiente, pero no más de una
     // vez cada 10 min: la gente cambia de pestaña a menudo y cada partida se
     // subía cada ~9 min en vez de cada 30 (12-10-2026, el mayor gasto de
     // Firebase). Lo que no se sube sigue en la copia de este navegador y se
     // sube al volver a entrar.
-    const hideFlush = () => { if (pending && Date.now() - lastPush > HIDE_GAP) pushNow(); };
+    const hideFlush = () => { if (pending && !conflict && (versioned || Date.now() - lastPush > HIDE_GAP)) pushNow(); };
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') hideFlush(); });
     addEventListener('pagehide', hideFlush);
     return true;
@@ -380,24 +389,70 @@ G.DB = (() => {
     uid = u.uid;
     if (G.Signups) G.Signups.report(u);          // tope de cuentas del mes (net/signups.js)
     const cached = read(K_CLOUD + uid);
-    let remote = null, online = true;
+    const meta = read(K_CLOUD_META + uid);
+    let remote = null, state = null, online = true;
     const cf = G.CFData && G.CFData.enabled();
+    if (opts.newAuth && !cf) throw { code: 'cloud_unavailable' };
     let legacyRead = false;
     try {
-      if (cf) remote = await G.CFData.getSave();
+      if (cf) {
+        state = await G.CFData.getSaveState(uid);
+        if (opts.newAuth && state.protocol !== 2) throw { code: 'cloud_unavailable' };
+        remote = state.save;
+      }
       // Una cuenta aún no migrada se lee una sola vez desde Firestore y se
-      // copia al Worker en el primer push posterior.
-      if (!remote) {
+      // copia al Worker en el primer push posterior. A NEW account must not
+      // depend on the exhausted Firestore quota just to create its first save.
+      if (!remote && !opts.newAuth && !(cached && cached.syncV === 2)) {
         legacyRead = true;
         const snap = await docRef().get();
         remote = snap.exists ? snap.data().save : null;
       }
     } catch (e) {
-      if (!cached) throw e;                // sin conexión y sin copia: no hay nada que abrir
+      // A freshly authenticated account may begin with a durable local copy
+      // while CF is unavailable. Other devices must not invent a second save.
+      if (!cached && !opts.newAuth) throw e;
       online = false;
     }
+    versioned = !!(opts.newAuth || (remote && remote.syncV === 2) || (cached && cached.syncV === 2));
+    cloudVersion = state ? state.version : (meta && meta.version) || null;
+    conflict = false;
+    if (versioned) {
+      if (state && state.protocol !== 2) throw { code: 'cloud_unavailable' };
+      if (remote && remote.syncV !== 2 && !cached) throw { code: 'save_conflict' };
+      if (!cf) online = false;
+      // Never replace a different cloud copy or silently discard an unsent
+      // browser copy. A conflict requires recovery, not a timestamp guess.
+      if (remote && remote.syncV !== 2) conflict = true;
+      if (remote && cached &&
+          ((meta && meta.pending && meta.version !== cloudVersion) ||
+           (!meta && JSON.stringify(cached) !== JSON.stringify(remote)))) conflict = true;
+      if (!remote && meta && meta.version) conflict = true;
+      let s = conflict || (meta && meta.pending && cached) ? cached : remote || cached;
+      if (!s) s = newSave(opts.name || displayNameOf(u));
+      if (opts.legacy) {
+        s = merge(s, opts.legacy.save);
+        write(K_MIGRATED + opts.legacy.key, uid);
+      }
+      s.syncV = 2;
+      save = migrate(s, s.name);
+      key = uid; user = save.name; guest = false;
+      pending = conflict || !remote || !!(meta && meta.pending) || !!opts.legacy;
+      const metaSaved = write(K_CLOUD_META + uid, { version: cloudVersion, pending, conflict });
+      const locallySaved = write(K_CLOUD + uid, save);
+      lastPush = 0;
+      if (conflict) setSync('conflict');
+      else if (!online) { pending = true; setSync('offline'); scheduleRetry(); }
+      else if (pending) await pushNow();
+      else setSync('ok');
+      if (!locallySaved || !metaSaved) throw { code: 'local_storage_unavailable' };
+      // A new account must not appear ready for cross-device play until the
+      // first save is durably acknowledged. Its local copy remains for retry.
+      if (opts.newAuth && syncState !== 'ok') throw { code: 'cloud_unavailable' };
+      return;
+    }
+    if (!remote && !cached) throw { code: 'save_missing' };
     let s = merge(cached && migrate(cached), remote && migrate(remote));
-    if (!s) s = newSave(opts.name || displayNameOf(u));
     if (opts.legacy) {
       s = merge(s, opts.legacy.save);
       write(K_MIGRATED + opts.legacy.key, uid);
@@ -424,9 +479,14 @@ G.DB = (() => {
    */
   function stopListening() { if (unlisten) { unlisten(); unlisten = null; } }
 
+  function rememberCloudState() {
+    if (versioned && uid) write(K_CLOUD_META + uid, { version: cloudVersion, pending, conflict });
+  }
+
   /** Sube la partida fusionándola con lo que haya en la nube (transacción). */
   function pushNow() {
     if (mode !== 'cloud' || guest || !save || !uid) return Promise.resolve();
+    if (conflict) { setSync('conflict'); return Promise.resolve(); }
     // Si ya hay una subida en marcha, se hace otra justo después (para lo que haya cambiado mientras).
     if (pushing) { pending = true; return pushing.then(() => (pending ? pushNow() : undefined)); }
     clearTimeout(pushT); pushT = 0; pushDue = 0;
@@ -437,17 +497,49 @@ G.DB = (() => {
     pending = false;
     lastPush = Date.now();
     setSync('syncing');
+    if (versioned) {
+      const snapshot = plain(save), serialized = JSON.stringify(snapshot), baseVersion = cloudVersion;
+      // A crash during the request must leave the local copy marked unsent.
+      write(K_CLOUD_META + uid, { version: baseVersion, pending: true, conflict: false });
+      let failed = false;
+      pushing = G.CFData.putSaveState(snapshot, baseVersion, uid).then(result => {
+        if (!result || !/^[a-f0-9]{64}$/.test(result.version || ''))
+          throw { code: 'save_ack_missing' };
+        cloudVersion = result.version;
+        pending = pending || JSON.stringify(save) !== serialized;
+        rememberCloudState();
+        fails = 0;
+        setSync(pending ? 'pending' : 'ok');
+        if (G.UI && G.UI.refreshCoins) G.UI.refreshCoins();
+      }).catch(e => {
+        pending = true; failed = true;
+        conflict = e.code === 'save_conflict' || e.code === 'version_required';
+        rememberCloudState();
+        setSync(conflict ? 'conflict' : 'offline');
+        if (!conflict) scheduleRetry();
+        console.warn('[DB] Cloudflare no pudo confirmar el guardado:', e.code || e.message);
+      }).finally(() => {
+        pushing = null;
+        if (!failed && pending && !conflict) schedulePush(V2_PUSH_URGENT);
+      });
+      return pushing;
+    }
     if (G.CFData && G.CFData.enabled()) {
       let failed = false;
-      pushing = G.CFData.putSave(plain(save)).then(() => {
+      pushing = G.CFData.putSave(plain(save), uid).then(() => {
         fails = 0; rejects = 0;
         setSync(pending ? 'pending' : 'ok');
         if (G.UI && G.UI.refreshCoins) G.UI.refreshCoins();
       }).catch(e => {
         console.warn('[DB] Cloudflare no pudo sincronizar:', e.code || e.message);
         pending = true; failed = true;
-        setSync('offline');
-        scheduleRetry();
+        if (e.code === 'save_conflict') {
+          conflict = true;
+          setSync('conflict');
+        } else {
+          setSync('offline');
+          scheduleRetry();
+        }
       }).finally(() => {
         pushing = null;
         if (!failed && pending && syncState === 'pending') schedulePush(Math.max(1500, PUSH_GAP - (Date.now() - lastPush)));
@@ -551,11 +643,17 @@ G.DB = (() => {
       'auth/operation-not-allowed': 'Ese método de inicio de sesión no está activado en Firebase.',
       'auth/requires-recent-login': 'Por seguridad, vuelve a iniciar sesión y repite la operación.',
       'permission-denied': 'La base de datos rechazó el acceso (revisa las reglas de Firestore).',
-      'unavailable': 'Sin conexión con la base de datos.'
+      'unavailable': 'Sin conexión con la base de datos.',
+      'cloud_unavailable': 'La primera partida aún no está confirmada en la nube. Conserva este navegador y vuelve a iniciar sesión cuando haya conexión.',
+      'save_missing': 'No encontramos la partida en la nube. No crearemos una nueva encima de ella: contacta con soporte.',
+      'save_conflict': 'La partida de la nube es diferente. Conserva este navegador y contacta con soporte; no la sobrescribiremos.',
+      'local_storage_unavailable': 'Este navegador no puede conservar una copia local. Libera espacio o permite el almacenamiento antes de jugar.'
     };
     if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return '';
+    if (c === 'resource-exhausted')
+      return 'La nube no está disponible ahora. No crearemos una partida vacía: conserva los datos de este navegador e inténtalo más tarde.';
     // El "portero" de Firebase (functions/index.js) ha rechazado la cuenta nueva: tope del mes.
-    if (/error-code:-47|BLOCKING_FUNCTION|resource-exhausted|cuentas nuevas/i.test(c + ' ' + ((e && e.message) || '')))
+    if (/error-code:-47|BLOCKING_FUNCTION|cuentas nuevas/i.test(c + ' ' + ((e && e.message) || '')))
       return 'Este mes ya no quedan plazas para cuentas nuevas (vuelven el 1 de ' + (G.Signups ? G.Signups.nextMonthName() : 'mes que viene') + '). Mientras, puedes jugar como invitado.';
     return M[c] || ('Error: ' + (c || (e && e.message) || 'desconocido'));
   }
@@ -572,7 +670,12 @@ G.DB = (() => {
     readyP = (async () => {
       try { if (await initCloud()) mode = 'cloud'; }
       catch (e) { console.warn('[DB] sin nube:', e.message); localReason = 'error'; mode = 'local'; }
-      if (mode === 'local') { setSync('local'); return restoreLocal(); }
+      // On the published site, a failed Firebase bootstrap must not silently
+      // turn a cloud account into a different, browser-only account.
+      if (mode === 'local') {
+        setSync('local');
+        return localReason === 'error' ? false : restoreLocal();
+      }
       const u = await new Promise(res => { const off = auth.onAuthStateChanged(x => { off(); res(x); }); });
       if (!u) return false;
       try { await openCloud(u); return true; }
@@ -582,6 +685,8 @@ G.DB = (() => {
   }
 
   async function register(name, pass) {
+    if (mode === 'local' && localReason === 'error')
+      return { ok: false, error: 'El inicio de sesión en la nube no está disponible. Vuelve a intentarlo más tarde; no crearemos una cuenta sólo en este navegador.' };
     name = (name || '').trim();
     if (!VALID.test(name)) return { ok: false, error: 'El nombre debe tener 3-16 letras, números o _.' };
     const min = mode === 'cloud' ? 6 : 4;
@@ -593,12 +698,14 @@ G.DB = (() => {
       const legacy = await legacySave(name, pass);
       const cred = await auth.createUserWithEmailAndPassword(nameToEmail(name), pass);
       if (G.Signups) G.Signups.markNew(cred.user.uid);   // ya la apuntó el portero
-      await openCloud(cred.user, { name, legacy });
+      await openCloud(cred.user, { name, legacy, newAuth: true });
       return { ok: true, isNew: !save.partner, imported: !!legacy };
     } catch (e) { return { ok: false, error: authError(e) }; }
   }
 
   async function login(name, pass) {
+    if (mode === 'local' && localReason === 'error')
+      return { ok: false, error: 'El inicio de sesión en la nube no está disponible. Vuelve a intentarlo más tarde; no crearemos una cuenta sólo en este navegador.' };
     name = (name || '').trim();
     if (mode === 'local') return loginLocal(name, pass);
     try {
@@ -620,7 +727,7 @@ G.DB = (() => {
         return { ok: false, error: 'Este mes ya no quedan plazas para cuentas nuevas (vuelven el 1 de ' + G.Signups.nextMonthName() + '). Mientras, puedes jugar como invitado.' };
       }
       if (cred.additionalUserInfo && cred.additionalUserInfo.isNewUser && G.Signups) G.Signups.markNew(cred.user.uid);
-      await openCloud(cred.user, { name: displayNameOf(cred.user) });
+      await openCloud(cred.user, { name: displayNameOf(cred.user), newAuth: !!(cred.additionalUserInfo && cred.additionalUserInfo.isNewUser) });
       return { ok: true, isNew: !save.partner };
     } catch (e) { return { ok: false, error: authError(e) }; }
   }
@@ -647,17 +754,31 @@ G.DB = (() => {
     if (guest || !key || !save) return false;
     save.updated = Date.now();
     if (mode === 'local') return write(K_SAVE + key, save);
-    write(K_CLOUD + uid, save);
     pending = true;
-    setSync('pending');
-    schedulePush(Math.max(1200, (urgent ? PUSH_GAP_URGENT : PUSH_GAP) - (Date.now() - lastPush)));
+    rememberCloudState();
+    const locallySaved = write(K_CLOUD + uid, save);
+    setSync(!locallySaved ? 'offline' : conflict ? 'conflict' : 'pending');
+    if (!conflict) schedulePush(Math.max(1200, (versioned
+      ? (urgent ? V2_PUSH_URGENT : V2_PUSH_GAP)
+      : (urgent ? PUSH_GAP_URGENT : PUSH_GAP)) - (Date.now() - lastPush)));
     commitListeners.forEach(fn => { try { fn(); } catch (e) { /* nada */ } });
-    return true;
+    return locallySaved;
   }
 
   /** Applies a server-authoritative save after a paid grant is claimed. */
-  function applyServerSave(remote) {
+  async function applyServerSave(remote) {
     if (!save || guest || !remote) return false;
+    if (versioned) {
+      if (pending || conflict) { setSync('conflict'); conflict = true; rememberCloudState(); return false; }
+      const state = await G.CFData.getSaveState(uid);
+      if (!state.save || state.save.syncV !== 2 || !state.version) return false;
+      applyInPlace(migrate(state.save, save.name));
+      cloudVersion = state.version;
+      write(K_CLOUD + uid, save);
+      rememberCloudState();
+      setSync('ok');
+      return true;
+    }
     applyInPlace(merge(plain(save), migrate(remote, save.name)));
     write(K_CLOUD + uid, save);
     pending = false;
@@ -671,6 +792,9 @@ G.DB = (() => {
   async function logout() {
     for (const fn of leaveHooks) { try { await fn('logout'); } catch (e) { /* nada */ } }
     if (mode === 'cloud' && !guest && save) {
+      // Do not change Firebase identity while a save request may still be
+      // obtaining its ID token or applying its acknowledgement.
+      if (pushing) { try { await pushing; } catch (e) { /* queda la copia local */ } }
       if (pending) { try { await pushNow(); } catch (e) { /* queda la copia local */ } }
       stopListening();
       try { await auth.signOut(); } catch (e) { /* nada */ }
@@ -680,6 +804,7 @@ G.DB = (() => {
     }
     clearTimeout(pushT); clearTimeout(retryT);
     user = key = save = uid = null; guest = false; pending = false;
+    versioned = false; cloudVersion = null; conflict = false;
     setSync(mode === 'cloud' ? 'ok' : 'local');
   }
 
@@ -717,6 +842,7 @@ G.DB = (() => {
       if (G.CFData && G.CFData.enabled()) await G.CFData.deleteSave().catch(() => {});
       else await docRef().delete();
       remove(K_CLOUD + uid);
+      remove(K_CLOUD_META + uid);
       await auth.currentUser.delete();
       user = key = save = uid = null;
       return { ok: true };

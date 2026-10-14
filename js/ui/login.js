@@ -50,7 +50,7 @@ G.LoginUI = (() => {
       ? 'Abierto desde un archivo: la partida sólo se guarda en este navegador. Para guardar en la nube, juega en la versión publicada.'
       : G.DB.localReason === 'config'
         ? 'Nube sin configurar: la partida sólo se guarda en este navegador.'
-        : 'No se pudo conectar con la nube: la partida sólo se guarda en este navegador.';
+        : 'No se pudo iniciar la nube: las cuentas están temporalmente desactivadas. Puedes jugar como invitado, pero esa partida no se guarda.';
     return why;
   }
 

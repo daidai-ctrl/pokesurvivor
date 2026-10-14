@@ -133,6 +133,14 @@ if (G.I18n.lang === 'zh-hant') G.I18n.add({
   'Invitado: no se guarda': '訪客：不會儲存',
   'Guardado en la nube': '已儲存至雲端',
   'Sin conexión: se subirá al volver': '離線：重新連線後會上傳',
+  'Pendiente de subir: espera a que termine antes de cambiar de dispositivo.': '等待上傳：切換裝置前請先確認已完成儲存。',
+  'Conflicto de guardado: no borres los datos de este navegador y contacta con soporte.': '存檔衝突：請勿清除此瀏覽器資料，並聯絡客服。',
+  'Conflicto de guardado: conserva los datos de este navegador y contacta con soporte.': '存檔衝突：請保留此瀏覽器資料，並聯絡客服。',
+  'La nube no está disponible ahora. No crearemos una partida vacía: conserva los datos de este navegador e inténtalo más tarde.': '雲端暫時無法使用。我們不會建立空白存檔；請保留此瀏覽器資料，稍後再試。',
+  'Sin conexión: conserva los datos de este navegador hasta que se confirme el guardado en la nube.': '離線中：請保留此瀏覽器資料，直到雲端存檔確認完成。',
+  'La primera partida aún no está confirmada en la nube. Conserva este navegador y vuelve a iniciar sesión cuando haya conexión.': '首份存檔尚未在雲端確認。請保留此瀏覽器資料，連線後再登入。',
+  'El inicio de sesión en la nube no está disponible. Vuelve a intentarlo más tarde; no crearemos una cuenta sólo en este navegador.': '雲端登入暫時無法使用。請稍後再試；我們不會建立僅存在此瀏覽器的帳號。',
+  'No se pudo iniciar la nube: las cuentas están temporalmente desactivadas. Puedes jugar como invitado, pero esa partida no se guarda.': '無法啟動雲端登入，帳號功能暫時停用。你仍可用訪客模式遊玩，但進度不會儲存。',
 
   // ---------------- 屬性與常見招式 ----------------
   'Acero': '鋼', 'Agua': '水', 'Bicho': '蟲', 'Dragón': '龍', 'Eléctrico': '電',

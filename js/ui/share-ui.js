@@ -118,8 +118,10 @@ G.ShareUI = (() => {
         await copyLink(shareData().url);
       }
       G.Analytics.event('share_invoked', { campaign: CAMPAIGN, method: typeof navigator.share === 'function' ? 'native' : 'copy' });
+      if (G.DB.syncState !== 'ok') await G.DB.flush();
+      if (G.DB.syncState !== 'ok') throw new Error('save_not_synced');
       const result = await G.CFData.claimShareReward(CAMPAIGN);
-      if (result.save) G.DB.applyServerSave(result.save);
+      if (result.save && !(await G.DB.applyServerSave(result.save))) throw new Error('save_not_synced');
       if (result.alreadyClaimed) {
         setLocalFlag('claimed');
         G.Analytics.event('share_reward_already_claimed', { campaign: CAMPAIGN });

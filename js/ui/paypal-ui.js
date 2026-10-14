@@ -103,7 +103,8 @@ G.PayPalUI = (() => {
       if (G.DB.syncState !== 'ok') throw new Error('存档尚未同步完成，请稍后再领取');
     }
     const result = await request('/v1/grants/' + encodeURIComponent(grantId) + '/claim', { method: 'POST', body: '{}' });
-    if (result.save) G.DB.applyServerSave(result.save);
+    if (result.save && !(await G.DB.applyServerSave(result.save)))
+      throw new Error('票券已发放到云端，但本机尚未确认同步。请保留当前浏览器并稍后重试。');
     return true;
   }
 
