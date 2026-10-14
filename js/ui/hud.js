@@ -3,6 +3,18 @@
  */
 G.HUD = (() => {
   const F = (w, s) => `${w} ${s}px Pixelify,"Segoe UI",system-ui,sans-serif`;
+  const CHAMPION_HIDDEN_KEY = 'ps.hud.champion.hidden';
+
+  function championHidden() {
+    try { return localStorage.getItem(CHAMPION_HIDDEN_KEY) === '1'; } catch (e) { return false; }
+  }
+
+  function setChampionHidden(hidden) {
+    try {
+      if (hidden) localStorage.setItem(CHAMPION_HIDDEN_KEY, '1');
+      else localStorage.removeItem(CHAMPION_HIDDEN_KEY);
+    } catch (e) { /* la tarjeta sigue funcionando aunque no haya almacenamiento */ }
+  }
 
   function roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
@@ -27,6 +39,7 @@ G.HUD = (() => {
 
   /** Insignia del campeón: siempre es el primer puesto del histórico en solitario. */
   function drawChampion(ctx, w) {
+    if (championHidden()) return;
     if (!G.Ranking || !G.Ranking.getChampion) return;
     const champion = G.Ranking.getChampion();
     const name = champion ? ((champion.names && champion.names[0]) || '???') : G.T('Esperando el primer récord');
@@ -69,6 +82,17 @@ G.HUD = (() => {
     ctx.fillText(name, x + cardW / 2 + 20, y + 52);
     ctx.font = F(700, 10); ctx.fillStyle = '#ffd23f';
     ctx.fillText(G.T('Mejor histórico'), x + cardW / 2 + 20, y + 71);
+
+    // Se puede ocultar durante la partida sin tapar el área de juego.
+    const closeX = x + cardW - 29, closeY = y + 8, closeS = 22;
+    roundRect(ctx, closeX, closeY, closeS, closeS, 7);
+    ctx.fillStyle = 'rgba(4,10,24,.78)'; ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.58)'; ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(closeX + 6, closeY + 6); ctx.lineTo(closeX + closeS - 6, closeY + closeS - 6);
+    ctx.moveTo(closeX + closeS - 6, closeY + 6); ctx.lineTo(closeX + 6, closeY + closeS - 6);
+    ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+    G.Touch.addButton(closeX, closeY, closeS, closeS, () => setChampionHidden(true), 7);
     ctx.restore();
   }
 
@@ -509,5 +533,5 @@ G.HUD = (() => {
     }
   }
 
-  return { draw, roundRect, bar };
+  return { draw, roundRect, bar, championHidden, setChampionHidden };
 })();

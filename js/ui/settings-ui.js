@@ -71,6 +71,17 @@ G.SettingsUI = (() => {
     return `<div class="set-row"><div class="grow"><b>${c.title}</b><small>${c.desc}</small></div>
       <button class="btn small switch ${hidden ? '' : 'gold'}" id="set-champion">${hidden ? c.no : c.yes}</button></div>`;
   }
+  function hudChampionControl() {
+    const lang = G.I18n.lang;
+    const c = lang === 'en'
+      ? { title: 'World champion during a run', desc: 'Show the champion card inside the game.', yes: 'Yes', no: 'No' }
+      : lang === 'zh-hant'
+        ? { title: '遊戲中的世界冠軍', desc: '在遊戲內顯示冠軍卡片。', yes: '是', no: '否' }
+        : { title: 'Campeón durante la partida', desc: 'Mostrar la tarjeta del campeón dentro de la partida.', yes: 'Sí', no: 'No' };
+    const hidden = G.HUD && G.HUD.championHidden ? G.HUD.championHidden() : false;
+    return `<div class="set-row"><div class="grow"><b>${c.title}</b><small>${c.desc}</small></div>
+      <button class="btn small switch ${hidden ? '' : 'gold'}" id="set-hud-champion">${hidden ? c.no : c.yes}</button></div>`;
+  }
   function choice(key, opts) {
     const cur = G.Settings.get(key);
     return `<div class="chips set-chips">${opts.map(([v, l]) => `<button class="chip ${v === cur ? 'on' : ''}" data-k="${key}" data-v="${v}">${esc(l)}</button>`).join('')}</div>`;
@@ -96,6 +107,7 @@ G.SettingsUI = (() => {
         + toggle('fps', 'Mostrar FPS', 'Fotogramas por segundo, en la esquina de abajo.')
         + section(G.I18n.lang === 'en' ? 'Menu' : G.I18n.lang === 'zh-hant' ? '主選單' : 'Menú')
         + championControl()
+        + hudChampionControl()
         + (canFull() ? `<div class="set-row"><div class="grow"><b>Pantalla completa</b><small>Sin barras del navegador.</small></div>
              <button class="btn small" id="set-full">${isFull() ? 'Salir' : 'Activar'}</button></div>`
            : iosTip() ? `<div class="set-row"><div class="grow"><b>Pantalla completa</b><small>${esc(IOS_TIP)}</small></div></div>` : '');
@@ -166,6 +178,11 @@ G.SettingsUI = (() => {
     const champion = $('set-champion');
     if (champion) champion.onclick = () => {
       if (G.MenuUI && G.MenuUI.setChampionHidden) G.MenuUI.setChampionHidden(!(G.MenuUI.championHidden && G.MenuUI.championHidden()));
+      render();
+    };
+    const hudChampion = $('set-hud-champion');
+    if (hudChampion) hudChampion.onclick = () => {
+      if (G.HUD && G.HUD.setChampionHidden) G.HUD.setChampionHidden(!(G.HUD.championHidden && G.HUD.championHidden()));
       render();
     };
     box.querySelectorAll('[data-lang]').forEach(b => { b.onclick = () => { if (b.dataset.lang !== G.I18n.lang) G.I18n.set(b.dataset.lang); }; });
