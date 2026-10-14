@@ -2,7 +2,20 @@
 G.MenuUI = (() => {
   const $ = G.UI.$;
   const GEN_NAMES = ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Teselia', 'Kalos', 'Alola', 'Galar', 'Paldea'];
+  const CHAMPION_HIDDEN_KEY = 'ps.menu.champion.hidden';
   let dexFilter = 'all', dexGen = 1, dexSel = null;
+
+  function championHidden() {
+    try { return localStorage.getItem(CHAMPION_HIDDEN_KEY) === '1'; } catch (e) { return false; }
+  }
+  function setChampionHidden(hidden) {
+    try {
+      if (hidden) localStorage.setItem(CHAMPION_HIDDEN_KEY, '1');
+      else localStorage.removeItem(CHAMPION_HIDDEN_KEY);
+    } catch (e) { /* prefer the visible state if storage is unavailable */ }
+    const card = $('menu-champion');
+    if (card) card.classList.toggle('hidden', !!hidden);
+  }
 
   function init() {
     const ICON = { play: 'ball', dex: 'book', upgrades: 'up', gacha: 'ball4', goals: 'medal3', friends: 'friends', rank: 'trophy', settings: 'gear' };
@@ -98,7 +111,14 @@ G.MenuUI = (() => {
     $('menu-champion-title').textContent = G.T('Campeón mundial · Solo');
     $('menu-champion-name').textContent = name;
     $('menu-champion-sub').textContent = G.T('Mejor histórico');
-    card.classList.remove('hidden');
+    const close = $('menu-champion-close');
+    if (close) {
+      const label = G.I18n.lang === 'en' ? 'Hide champion' : G.I18n.lang === 'zh-hant' ? '隱藏冠軍' : 'Ocultar campeón';
+      close.setAttribute('aria-label', label);
+      close.title = label;
+      close.onclick = () => setChampionHidden(true);
+    }
+    card.classList.toggle('hidden', championHidden());
   }
 
   /** Texto bajo "Amigos" y "Jugar": quién está en línea, solicitudes, sala. */
@@ -376,5 +396,5 @@ G.MenuUI = (() => {
     return el;
   }
 
-  return { init, open, GEN_NAMES };
+  return { init, open, GEN_NAMES, championHidden, setChampionHidden };
 })();

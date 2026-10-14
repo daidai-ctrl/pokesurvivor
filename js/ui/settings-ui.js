@@ -60,6 +60,17 @@ G.SettingsUI = (() => {
     return `<div class="set-row"><div class="grow"><b>${esc(label)}</b><small>${esc(desc)}</small></div>
       <button class="btn small switch ${on ? 'gold' : ''}" data-k="${key}">${on ? 'Sí' : 'No'}</button></div>`;
   }
+  function championControl() {
+    const lang = G.I18n.lang;
+    const c = lang === 'en'
+      ? { title: 'World champion', desc: 'Show the champion card in the main menu.', yes: 'Yes', no: 'No' }
+      : lang === 'zh-hant'
+        ? { title: '世界冠軍', desc: '在主選單顯示冠軍卡片。', yes: '是', no: '否' }
+        : { title: 'Campeón mundial', desc: 'Mostrar la tarjeta del campeón en el menú principal.', yes: 'Sí', no: 'No' };
+    const hidden = G.MenuUI && G.MenuUI.championHidden ? G.MenuUI.championHidden() : false;
+    return `<div class="set-row"><div class="grow"><b>${c.title}</b><small>${c.desc}</small></div>
+      <button class="btn small switch ${hidden ? '' : 'gold'}" id="set-champion">${hidden ? c.no : c.yes}</button></div>`;
+  }
   function choice(key, opts) {
     const cur = G.Settings.get(key);
     return `<div class="chips set-chips">${opts.map(([v, l]) => `<button class="chip ${v === cur ? 'on' : ''}" data-k="${key}" data-v="${v}">${esc(l)}</button>`).join('')}</div>`;
@@ -83,6 +94,8 @@ G.SettingsUI = (() => {
         + toggle('dmgNumbers', 'Números de daño', 'Los números que salen al golpear y al recibir daño.')
         + toggle('calm', 'Menos sacudidas y destellos', 'La cámara tiembla menos y los fogonazos son suaves.')
         + toggle('fps', 'Mostrar FPS', 'Fotogramas por segundo, en la esquina de abajo.')
+        + section(G.I18n.lang === 'en' ? 'Menu' : G.I18n.lang === 'zh-hant' ? '主選單' : 'Menú')
+        + championControl()
         + (canFull() ? `<div class="set-row"><div class="grow"><b>Pantalla completa</b><small>Sin barras del navegador.</small></div>
              <button class="btn small" id="set-full">${isFull() ? 'Salir' : 'Activar'}</button></div>`
            : iosTip() ? `<div class="set-row"><div class="grow"><b>Pantalla completa</b><small>${esc(IOS_TIP)}</small></div></div>` : '');
@@ -150,6 +163,11 @@ G.SettingsUI = (() => {
       b.onclick = () => { const v = b.dataset.v; G.Settings.set(b.dataset.k, isNaN(+v) ? v : +v); render(); };
     });
     const full = $('set-full'); if (full) full.onclick = toggleFull;
+    const champion = $('set-champion');
+    if (champion) champion.onclick = () => {
+      if (G.MenuUI && G.MenuUI.setChampionHidden) G.MenuUI.setChampionHidden(!(G.MenuUI.championHidden && G.MenuUI.championHidden()));
+      render();
+    };
     box.querySelectorAll('[data-lang]').forEach(b => { b.onclick = () => { if (b.dataset.lang !== G.I18n.lang) G.I18n.set(b.dataset.lang); }; });
     const lo = $('set-login'); if (lo) lo.onclick = () => { close(); leave(); };
     const out = $('set-logout'); if (out) out.onclick = () => { close(); leave(); };

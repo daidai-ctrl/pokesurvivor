@@ -206,16 +206,6 @@
 
 <!-- ====== Menú principal ====== -->
 <section id="scr-menu" class="scr hidden">
-  <div class="menu-champion hidden" id="menu-champion" aria-live="polite">
-    <div class="champion-laurel laurel-left" aria-hidden="true"></div>
-    <div class="champion-emblem" id="menu-champion-icon"></div>
-    <div class="champion-copy">
-      <div class="champion-title" id="menu-champion-title"></div>
-      <div class="champion-name" id="menu-champion-name"></div>
-      <div class="champion-sub" id="menu-champion-sub"></div>
-    </div>
-    <div class="champion-laurel laurel-right" aria-hidden="true"></div>
-  </div>
   <div class="menu-left">
     <div class="logo">
       <div class="t1">PokéSurvivor</div>
@@ -250,6 +240,17 @@
     <div class="box" style="padding:14px 18px">
       <div id="menu-stats" style="font-size:14px;color:var(--muted)"></div>
     </div>
+    <aside class="menu-champion hidden" id="menu-champion" aria-live="polite">
+      <button class="champion-close" id="menu-champion-close" type="button" aria-label="Ocultar campeón">×</button>
+      <div class="champion-laurel laurel-left" aria-hidden="true"></div>
+      <div class="champion-emblem" id="menu-champion-icon"></div>
+      <div class="champion-copy">
+        <div class="champion-title" id="menu-champion-title"></div>
+        <div class="champion-name" id="menu-champion-name"></div>
+        <div class="champion-sub" id="menu-champion-sub"></div>
+      </div>
+      <div class="champion-laurel laurel-right" aria-hidden="true"></div>
+    </aside>
   </div>
 </section>
 
@@ -593,6 +594,6 @@
 </section>
 
 <!-- datos generados -->
-<script defer src="js/app.min.js?v=c626767fa6"></script>
+<script defer src="js/app.min.js?v=c97a6031c3"></script>
 </body>
 </html>
