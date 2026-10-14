@@ -437,7 +437,8 @@ G.Social = (() => {
         return room;
       } catch (e) {
         G.CFRoom.close(false);
-        console.warn('[Social] sala CF, se usa RTDB:', e.message);
+        console.warn('[Social] sala CF:', e.message);
+        throw e;
       }
     }
     rtOn();
@@ -572,7 +573,11 @@ G.Social = (() => {
     if (!f || f.status !== 'ok') return { ok: false, error: 'Sólo puedes invitar a tus amigos.' };
     if (room && room.members.length >= MAX_PLAYERS) return { ok: false, error: 'La sala está llena.' };
     if (room && !room.isHost) return { ok: false, error: 'Sólo el anfitrión de la sala puede invitar.' };
-    if (!room) await createRoom();
+    if (!room) {
+      try { await createRoom(); }
+      catch (e) { return { ok: false, error: 'No se pudo entrar en la sala.' }; }
+    }
+    if (!room) return { ok: false, error: 'No se pudo entrar en la sala.' };
     try {
       if (G.CFData && G.CFData.enabled()) await G.CFData.putInvite({ id: other + '_' + uid, to: other, from: uid, room: room.id, name: me.name, at: Date.now() });
       else await fb.fs.collection('inv').doc(other + '_' + uid).set({ to: other, from: uid, room: room.id, name: me.name, at: fts() });

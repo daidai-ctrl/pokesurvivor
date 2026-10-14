@@ -5,7 +5,7 @@
  * it off RTDB does not touch saves, accounts, rankings or social records.
  */
 G.CFRoom = (() => {
-  let socket = null, roomId = null, heartbeat = 0, sessionStateOff = null;
+  let socket = null, roomId = null, heartbeat = 0, openTimer = 0, sessionStateOff = null;
   const stateListeners = new Set(), messageListeners = new Set();
   let active = false;
 
@@ -26,6 +26,7 @@ G.CFRoom = (() => {
 
   function close(sendLeave = true) {
     stopHeartbeat();
+    if (openTimer) { clearTimeout(openTimer); openTimer = 0; }
     if (sessionStateOff) { sessionStateOff(); sessionStateOff = null; }
     const s = socket;
     socket = null; active = false; roomId = null;
@@ -48,6 +49,7 @@ G.CFRoom = (() => {
       const fail = error => {
         if (failed) return;
         failed = true; stopHeartbeat(); active = false;
+        if (openTimer) { clearTimeout(openTimer); openTimer = 0; }
         if (socket) { try { socket.close(); } catch (e) { /* nada */ } }
         socket = null; roomId = null;
         reject(error instanceof Error ? error : new Error(String(error || 'room_error')));
@@ -67,6 +69,7 @@ G.CFRoom = (() => {
         if (!message) return;
         if (message.type === 'room' && message.room) {
           active = true;
+          if (openTimer) { clearTimeout(openTimer); openTimer = 0; }
           if (!settled) { settled = true; resolve(message.room); }
           stateListeners.forEach(fn => { try { fn(message.room); } catch (e) { console.warn(e); } });
           return;
@@ -86,6 +89,7 @@ G.CFRoom = (() => {
         }
       };
       socket.onerror = () => { if (!settled) fail(new Error('room_connection')); };
+      openTimer = setTimeout(() => { if (!settled) fail(new Error('room_timeout')); }, 10000);
       socket.onclose = () => {
         stopHeartbeat();
         const wasActive = active;
