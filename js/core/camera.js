@@ -35,6 +35,10 @@ G.Camera = {
   },
 
   kick(amount) {
+    // Arena is meant to stay readable while eight fighters and their AI
+    // effects are active. In that mode damage/skills from any participant
+    // must not move the shared camera; classic mode keeps its normal shake.
+    if (G.Arena && G.Arena.active) return;
     if (G.Settings.get('calm')) amount *= 0.25;      // "menos sacudidas"
     this.shake = Math.min(1.2, this.shake + amount);
   },

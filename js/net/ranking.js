@@ -424,9 +424,10 @@ G.Ranking = (() => {
     const fb = fbx();
     if (!fb) return [];
     const scope = !!friendsOnly;
+    const cacheKey = 'ps.rk.collection.top.v2.' + (scope ? 'friends' : 'all');
     if (collectionCache && collectionCache.scope === scope && Date.now() - collectionCache.at < DAILY) return collectionCache.rows;
     try {
-      const cached = JSON.parse(localStorage.getItem('ps.rk.collection.top.' + (scope ? 'friends' : 'all')) || 'null');
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
       if (cached && Date.now() - cached.at < DAILY && Array.isArray(cached.rows)) {
         collectionCache = { at: cached.at, rows: cached.rows, scope };
         return cached.rows;
@@ -437,11 +438,11 @@ G.Ranking = (() => {
       const circle = friendsOnly ? [fb.uid, ...G.Social.friends.filter(f => f.status === 'ok').map(f => f.uid)].slice(0, 30) : [];
       if (G.CFData && G.CFData.enabled()) {
         const rows = await G.CFData.collectionTop(circle);
-        if (rows.length) {
-          collectionCache = { at: Date.now(), rows, scope };
-          try { localStorage.setItem('ps.rk.collection.top.' + (scope ? 'friends' : 'all'), JSON.stringify(collectionCache)); } catch (e) { /* nada */ }
-          return rows;
-        }
+        collectionCache = { at: Date.now(), rows, scope };
+        try { localStorage.setItem(cacheKey, JSON.stringify(collectionCache)); } catch (e) { /* nada */ }
+        // CF is authoritative after migration. An empty result is valid and
+        // must not fall back to the old Firestore collection.
+        return rows;
       }
       if (friendsOnly) {
         docs = await Promise.all(circle.map(uid => fb.fs.collection('collections').doc(uid).get().catch(() => null)));

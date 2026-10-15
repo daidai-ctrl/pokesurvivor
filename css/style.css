@@ -46,6 +46,37 @@ body {
 }
 canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 #game { display: block; width: 100vw; height: 100vh; height: 100dvh; touch-action: none; }
+#arena-hud-scoreboard {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  width: min(286px, calc(100vw - 24px));
+  padding: 8px;
+  pointer-events: none;
+  color: var(--ink);
+  background: linear-gradient(180deg, rgba(8, 22, 50, .94), rgba(5, 13, 35, .88));
+  border: 2px solid rgba(127, 224, 255, .72);
+  border-radius: 9px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .36), inset 0 0 0 1px rgba(244, 248, 255, .1);
+  text-shadow: 1px 1px 0 var(--shadow);
+}
+.arena-hud-title { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin: 0 2px 5px; color: var(--gold); font-size: 13px; }
+.arena-hud-title b { color: #dfffea; font-size: 12px; }
+.arena-hud-header { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 5px; padding: 0 4px 3px; color: rgba(232, 240, 255, .62); font-size: 10px; }
+.arena-hud-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 5px; align-items: center; min-height: 27px; padding: 3px 4px; border-top: 1px solid rgba(244, 248, 255, .1); font-size: 12px; }
+.arena-hud-row.out { opacity: .48; }
+.arena-hud-rank { color: var(--gold); font-weight: 700; }
+.arena-hud-name { min-width: 0; overflow: hidden; }
+.arena-hud-name b, .arena-hud-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arena-hud-name b { font-weight: 700; }
+.arena-hud-name small { color: var(--muted); font-size: 10px; }
+.arena-hud-state { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; color: #a9dcff; font-size: 11px; white-space: nowrap; }
+.arena-hud-hp { color: #8fffa5; font-size: 10px; line-height: 1; }
+.arena-hud-hpbar { display: block; width: 72px; height: 4px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.18); }
+.arena-hud-hpbar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ff6175, #8fffa5); }
+.arena-hud-row.me { background: rgba(255, 210, 63, .12); border-radius: 5px; }
+.arena-hud-row.me .arena-hud-name b, .arena-hud-row.me .arena-hud-state { color: var(--gold); }
 button { font: inherit; color: inherit; }
 input { font: inherit; }
 
@@ -390,6 +421,86 @@ label { display: block; font-size: 14px; color: var(--muted); margin: 8px 0 4px;
   .pcard b { font-size: 12px; }
   .pcard .tag { font-size: 10px; }
   .pcard .stars { font-size: 11px; }
+}
+
+/* ---------- Arena MVP local ---------- */
+#scr-arena { padding-top: 66px; }
+.arena-box { width: min(1080px, 100%); max-height: calc(100dvh - 82px); }
+.arena-head { gap: 14px; align-items: flex-start; }
+.arena-head .sub { margin-bottom: 0; }
+.arena-rules { display: flex; gap: 8px 18px; flex-wrap: wrap; margin: 4px 0 14px; color: var(--muted); }
+.arena-rules span { padding-right: 18px; border-right: 1px solid rgba(255,255,255,.16); }
+.arena-rules span:last-child { border-right: 0; }
+.arena-rules b { color: var(--gold); }
+.arena-setup { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(360px, 1.15fr); gap: 14px; }
+.arena-role-panel, .arena-room-panel { min-width: 0; }
+.arena-role-panel .stage { width: 180px; height: 150px; }
+.arena-role-detail { min-height: 82px; margin: 4px 0 10px; }
+.arena-role-title { color: var(--gold); font-size: 18px; }
+.arena-role-stats { color: var(--muted); font-size: 14px; margin: 4px 0 8px; }
+.arena-role-moves { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; font-size: 12px; }
+.arena-role-moves .sub { flex-basis: 100%; margin: 0; font-size: 12px; }
+.arena-role-moves .chip { padding: 2px 6px; font-size: 12px; }
+.arena-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; max-height: 300px; overflow-y: auto; padding: 2px; }
+.arena-slot { display: grid; grid-template-columns: 24px 1fr; gap: 0 6px; align-items: center; min-height: 46px; padding: 5px 8px; background: rgba(0,0,0,.2); border: 2px solid rgba(244,248,255,.15); border-radius: 8px; }
+.arena-slot.human { border-color: var(--gold); background: rgba(255,210,63,.12); }
+.arena-slot-no { grid-row: span 2; color: var(--gold); font-weight: 700; }
+.arena-slot-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+.arena-slot-mon { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena-empty { grid-column: 1 / -1; margin: 16px 0; text-align: center; }
+.arena-battle { margin-top: 10px; }
+.arena-clock { color: var(--muted); font-size: 15px; }
+.arena-clock b, .arena-clock span { color: var(--gold); }
+.arena-canvas { display: block; width: 100%; max-height: 53vh; height: auto; margin: 8px auto 12px; background: #081632; border: 3px solid var(--edge-in); border-radius: 10px; image-rendering: auto; }
+.arena-scoreboard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 8px; }
+.arena-score { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 4px 7px; align-items: center; padding: 5px 8px; border-radius: 7px; background: rgba(0,0,0,.22); border: 1px solid rgba(244,248,255,.14); font-size: 13px; }
+.arena-score.out { opacity: .55; }
+.arena-rank { color: var(--gold); font-weight: 700; }
+.arena-score-name { min-width: 0; }
+.arena-score-name b, .arena-score-name small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena-score-name small, .arena-score-kills { color: var(--muted); font-size: 11px; }
+.arena-score-hp { color: #dfffea; font-size: 12px; white-space: nowrap; }
+.arena-score-kills { grid-column: 2 / -1; }
+.arena-death-box { width: min(430px, 100%); }
+.arena-death-box .btn { margin-top: 8px; }
+.arena-feedback-box { width: min(560px, 100%); max-height: calc(100dvh - 34px); overflow-y: auto; }
+#scr-arena-feedback { z-index: 75; }
+.arena-notice-box { width: min(640px, 100%); max-height: calc(100dvh - 34px); overflow-y: auto; }
+#scr-arena-notice { z-index: 70; }
+.arena-notice-lead { margin: 14px 0 12px; color: var(--ink); line-height: 1.55; }
+.arena-notice-rewards { display: grid; gap: 8px; margin: 12px 0; border-color: rgba(255, 210, 63, .38); background: rgba(255, 210, 63, .08); }
+.arena-notice-reward { display: grid; grid-template-columns: minmax(150px, .45fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.arena-notice-reward b { color: var(--gold); white-space: nowrap; }
+.arena-notice-reward span { color: var(--ink); font-size: 13px; }
+.arena-notice-rewards .note { min-height: 17px; margin: 0; }
+.arena-notice-panel { margin-top: 10px; }
+.arena-notice-panel h3 { margin: 0 0 6px; color: var(--gold); }
+.arena-notice-panel p { margin: 0; line-height: 1.5; }
+.arena-notice-list { margin: 0; padding-left: 20px; color: var(--ink); line-height: 1.5; }
+.arena-notice-list li + li { margin-top: 5px; }
+.arena-notice-warning { border-color: rgba(255, 210, 63, .35); background: rgba(255, 210, 63, .07); }
+.arena-feedback-form { display: grid; gap: 10px; margin-top: 12px; }
+.arena-feedback-form fieldset { display: grid; gap: 6px; margin: 0; padding: 10px 12px; border: 1px solid rgba(244,248,255,.18); border-radius: 9px; }
+.arena-feedback-form legend { padding: 0 4px; color: var(--gold); font-weight: 700; }
+.arena-feedback-form label { display: flex; align-items: flex-start; gap: 8px; color: var(--ink); line-height: 1.3; cursor: pointer; }
+.arena-feedback-form input { margin-top: 3px; accent-color: var(--gold); }
+.arena-feedback-form select, .arena-feedback-form textarea { width: 100%; box-sizing: border-box; }
+.arena-feedback-wide { margin-top: 2px; }
+.arena-feedback-form .error { min-height: 18px; margin: 0; color: #ff9b9b; font-size: 13px; }
+.arena-menu { color: #ffcb3d; }
+@media (max-width: 760px) {
+  #scr-arena { padding: 52px 8px 8px; }
+  .arena-box { max-height: calc(100dvh - 60px); padding: 12px; }
+  .arena-setup { grid-template-columns: 1fr; }
+  .arena-role-panel .stage { width: 140px; height: 116px; }
+  .arena-slots { max-height: 220px; }
+  .arena-scoreboard { grid-template-columns: 1fr; }
+  .arena-feedback-box { max-height: calc(100dvh - 16px); padding: 12px; }
+  .arena-notice-box { max-height: calc(100dvh - 16px); padding: 12px; }
+  .arena-notice-reward { grid-template-columns: 1fr; gap: 3px; }
+  .arena-notice-reward .btn { justify-self: start; margin-top: 3px; }
+  .arena-rules { gap: 4px 10px; font-size: 12px; }
+  .arena-rules span { padding-right: 10px; }
 }
 #pull-fx.hidden { display: none; }
 .ball {

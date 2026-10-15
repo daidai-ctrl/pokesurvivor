@@ -18,12 +18,23 @@ G.Spawner = (() => {
   // Menos Pokémon pero más fuertes (la pantalla no se satura): salen ~24% de
   // los de antes, cada uno con más vida, daño y experiencia.
   const DENSITY = 0.24, DMG_K = 2.4, XP_K = 5.6;
+  // Arena monsters are pressure, not the main opponent. Their per-unit
+  // strength is softened, but the current classic spawn budget is preserved
+  // so eight fighters are not competing for a half-sized monster pool.
+  const ARENA_MONSTER_HP = 0.72;
+  const ARENA_MONSTER_DAMAGE = 0.65;
   // La resistencia extra crece con la run: al principio ×3,3 y hasta ×5
   // hacia el minuto 6, cuando ya tienes ataques para tumbarlos.
   const hpK = t => 3.3 + Math.min(1.7, t / 210);
   const SHINY_RATE = 1 / 4096;
   let acc = 0, bossIdx = 0, surgeT = 32, announce = null, announceT = 0, preloadT = 0;
   let forceShiny = 0;           // para pruebas: los N próximos salen shiny
+
+  function arenaMode() {
+    return !!(G.Game && G.Game.mode === 'arena' && G.Arena && G.Arena.active);
+  }
+
+  function enemyCap() { return CAP; }
 
   function reset() {
     acc = 0; bossIdx = 0; surgeT = 32; announce = null; announceT = 0; preloadT = 0;
@@ -81,9 +92,14 @@ G.Spawner = (() => {
     const pt = freePoint(pl, angle == null ? Math.random() * 6.2832 : angle, isFlyer(def));
     if (!pt) return null;
     const shiny = rollShiny(def.dex);
-    const e = new G.Enemy(def, pt[0], pt[1], scaled(G.Enemies.scale(t), G.Coop.scaleHp(players.length) * hpK(t)));
-    e.dmg *= DMG_K; e.xp = Math.round(e.xp * XP_K);
-    if (G.EnemyMgr.count >= CAP * ELITE_FROM) { e.maxHp = e.hp = Math.round(e.maxHp * 1.6); e.dmg *= 1.25; e.xp = Math.round(e.xp * 1.6); }
+    // Eight Arena fighters do not multiply PvE health as if this were an
+    // eight-player co-op horde. The monster budget itself stays at the
+    // current classic baseline so there is enough PvE pressure for everyone.
+    const hpScale = arenaMode() ? 1 : G.Coop.scaleHp(players.length);
+    const arenaK = arenaMode() ? ARENA_MONSTER_HP : 1;
+    const e = new G.Enemy(def, pt[0], pt[1], scaled(G.Enemies.scale(t), hpScale * hpK(t) * arenaK));
+    e.dmg *= DMG_K * (arenaMode() ? ARENA_MONSTER_DAMAGE : 1); e.xp = Math.round(e.xp * XP_K);
+    if (G.EnemyMgr.count >= enemyCap() * ELITE_FROM) { e.maxHp = e.hp = Math.round(e.maxHp * 1.6); e.dmg *= 1.25; e.xp = Math.round(e.xp * 1.6); }
     if (shiny) e.makeShiny();
     if (G.Events.golden) e.makeGolden();
     G.EnemyMgr.add(e);
@@ -96,7 +112,9 @@ G.Spawner = (() => {
 
   function spawnBoss(pl, t, b) {
     const [x, y] = ringPoint(pl, Math.random() * 6.2832);
-    const e = new G.Enemy(b, x, y, scaled(G.Enemies.bossScale(t), G.Coop.scaleHp(players.length) * (players.length > 1 ? 1.4 : 1)), true);
+    const playerScale = arenaMode() ? 1 : G.Coop.scaleHp(players.length) * (players.length > 1 ? 1.4 : 1);
+    const e = new G.Enemy(b, x, y, scaled(G.Enemies.bossScale(t), playerScale * (arenaMode() ? ARENA_MONSTER_HP : 1)), true);
+    if (arenaMode()) e.dmg *= ARENA_MONSTER_DAMAGE;
     if (rollShiny(b.dex)) e.makeShiny();
     G.EnemyMgr.add(e);
     say('¡' + e.name + (e.shiny ? ' shiny' : '') + ' salvaje apareció!', 3.2);
@@ -116,20 +134,25 @@ G.Spawner = (() => {
     preloadT -= dt;
     if (preloadT <= 0) { preloadT = 10; G.Sprites.preload(G.Enemies.upcomingDex(t, 60)); }
 
-    // --- jefes ---
-    const b = G.Enemies.BOSSES[bossIdx];
-    if (b && t >= b.at) { spawnBoss(anchor(), t, b); bossIdx++; }
+    // Arena MVP deliberately has ordinary monsters only. No classic timed
+    // bosses are spawned here; the PvP winner and the gas are the match rules.
+    if (!arenaMode()) {
+      const b = G.Enemies.BOSSES[bossIdx];
+      if (b && t >= b.at) { spawnBoss(anchor(), t, b); bossIdx++; }
+    }
 
     // Combate de jefe: las oleadas bajan al 25% y no hay mareas, para que el
     // jefe sea un momento propio y se le pueda apuntar entre la multitud.
-    const bossFight = G.EnemyMgr.bossAlive();
+    const bossFight = !arenaMode() && G.EnemyMgr.bossAlive();
 
     // --- goteo normal ---
-    if (G.EnemyMgr.count < CAP) {
-      acc += rate(t) * G.Coop.scaleRate(players.length) * (bossFight ? 0.25 : 1) * dt;
+    const cap = enemyCap();
+    const rateScale = arenaMode() ? 1 : G.Coop.scaleRate(players.length);
+    if (G.EnemyMgr.count < cap) {
+      acc += rate(t) * rateScale * (bossFight ? 0.25 : 1) * dt;
       let n = Math.floor(acc);
       acc -= n;
-      while (n-- > 0 && G.EnemyMgr.count < CAP) spawnOne(anchor(), t);
+      while (n-- > 0 && G.EnemyMgr.count < cap) spawnOne(anchor(), t);
     }
 
     // --- marea ---
@@ -138,7 +161,7 @@ G.Spawner = (() => {
       surgeT = G.U.rand(38, 56);
       const base = Math.random() * 6.2832;
       const target = anchor();
-      const n = Math.min(CAP - G.EnemyMgr.count, Math.round((14 + Math.floor(t / 22)) * G.Coop.scaleRate(players.length) * 0.4));
+      const n = Math.min(cap - G.EnemyMgr.count, Math.round((14 + Math.floor(t / 22)) * rateScale * 0.4));
       for (let i = 0; i < n; i++) spawnOne(target, t, base + G.U.rand(-0.55, 0.55));
       say('¡Marea de Pokémon!', 2.2);
       G.Audio.sfx('surge');
@@ -148,7 +171,8 @@ G.Spawner = (() => {
   /** Unos cuantos de golpe desde un lado (al empezar una horda). */
   function burst(n) {
     const base = Math.random() * 6.2832, target = anchor() || G.Game.player, t = G.Game.st.time;
-    for (let i = 0; i < n && G.EnemyMgr.count < CAP + 10; i++) spawnOne(target, t, base + G.U.rand(-0.6, 0.6));
+    const cap = enemyCap();
+    for (let i = 0; i < n && G.EnemyMgr.count < cap + 10; i++) spawnOne(target, t, base + G.U.rand(-0.6, 0.6));
   }
 
   /**

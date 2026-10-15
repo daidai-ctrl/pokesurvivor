@@ -40,12 +40,20 @@ G.CFData = (() => {
     createWaffoCheckout: (itemId, requestId) => request('/v1/waffo/checkout', {
       method: 'POST', body: JSON.stringify({ itemId, requestId })
     }),
+    // Arena money and match assignment are server-owned. The client only
+    // sends the owned role selection and an idempotency request id.
+    arenaQueue: value => request('/v1/arena/queue', { method: 'POST', body: JSON.stringify(value || {}) }),
+    arenaQueueStatus: () => request('/v1/arena/queue'),
+    arenaCancelQueue: () => request('/v1/arena/queue', { method: 'DELETE' }),
+    arenaMatch: matchId => get('/v1/arena/match?' + qs({ matchId })),
+    arenaReport: value => request('/v1/arena/report', { method: 'POST', body: JSON.stringify(value || {}) }),
     getSaveState: expectedUid => request('/v1/save', { expectedUid }),
     putSave: (value, expectedUid) => request('/v1/save', { method: 'PUT', body: JSON.stringify({ save: value }), expectedUid }),
     putSaveState: (value, baseVersion, expectedUid) => request('/v1/save', { method: 'PUT', body: JSON.stringify({ save: value, baseVersion }), expectedUid }),
     deleteSave: () => del('/v1/save'),
     putRun: value => put('/v1/run', value),
     deleteRun: () => del('/v1/run'),
+    putArenaFeedback: value => put('/v1/arena-feedback', value),
     putCollection: value => put('/v1/collection', value),
     deleteCollection: () => del('/v1/collection'),
     collectionTop: uids => get('/v1/collection' + (uids && uids.length ? '?' + qs({ uids: uids.join(',') }) : ''))

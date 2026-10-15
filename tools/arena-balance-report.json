@@ -1,0 +1,1881 @@
+{
+  "model": {
+    "roster": 103,
+    "players": 8,
+    "matchesPerPass": 20000,
+    "tickSeconds": 0.5,
+    "safeSeconds": 600,
+    "frenzySeconds": 60,
+    "growth": "shared PvP level at 0/150/300/450/600 seconds; no monster XP or PvE data",
+    "duplicateRoles": "allowed",
+    "typeChart": "sqrt-softened and clamped to 0.76–1.34",
+    "openingRule": "shared neutral arena-basic attack; role moves unlock at 150/300/450 seconds",
+    "originalStarterKinds": {
+      "beam": 19,
+      "projectile": 46,
+      "melee": 31,
+      "nova": 6,
+      "orbit": 1
+    }
+  },
+  "balanceCriteria": {
+    "targetWinRate": 0.125,
+    "targetTop3Rate": 0.375,
+    "stopRule": "win-rate spread <= 7.5 percentage points and mean absolute error <= 1.8 points"
+  },
+  "tuningHistory": [
+    {
+      "iteration": 1,
+      "minWin": 0.05452212957023733,
+      "maxWin": 0.18863636363636363,
+      "spread": 0.1341142340661263,
+      "meanAbsWinError": 0.018490795142182874,
+      "pass": false
+    },
+    {
+      "iteration": 2,
+      "minWin": 0.10615779345734445,
+      "maxWin": 0.14085881587508134,
+      "spread": 0.034701022417736885,
+      "meanAbsWinError": 0.0055001619967623315,
+      "pass": true
+    }
+  ],
+  "validation": {
+    "matches": 20000,
+    "seed": -1398233424,
+    "summary": {
+      "minWin": 0.10221354166666667,
+      "maxWin": 0.15475409836065573,
+      "spread": 0.05254055669398906,
+      "meanAbsWinError": 0.008211951839434106,
+      "pass": true
+    },
+    "strongest": [
+      {
+        "name": "Landorus",
+        "dex": 645,
+        "win": "15.48%",
+        "top3": "41.84%",
+        "samples": 1525
+      },
+      {
+        "name": "Azelf",
+        "dex": 482,
+        "win": "14.65%",
+        "top3": "40.35%",
+        "samples": 1529
+      },
+      {
+        "name": "Rayquaza",
+        "dex": 384,
+        "win": "14.64%",
+        "top3": "39.86%",
+        "samples": 1523
+      },
+      {
+        "name": "Ogerpon",
+        "dex": 1017,
+        "win": "14.58%",
+        "top3": "40.40%",
+        "samples": 1557
+      },
+      {
+        "name": "Diancie",
+        "dex": 719,
+        "win": "14.54%",
+        "top3": "40.31%",
+        "samples": 1486
+      },
+      {
+        "name": "Dragonite",
+        "dex": 149,
+        "win": "14.15%",
+        "top3": "41.01%",
+        "samples": 1541
+      },
+      {
+        "name": "Victini",
+        "dex": 494,
+        "win": "14.07%",
+        "top3": "39.76%",
+        "samples": 1557
+      },
+      {
+        "name": "Darkrai",
+        "dex": 491,
+        "win": "14.01%",
+        "top3": "40.90%",
+        "samples": 1599
+      }
+    ],
+    "weakest": [
+      {
+        "name": "Cosmog",
+        "dex": 789,
+        "win": "10.22%",
+        "top3": "36.13%",
+        "samples": 1536
+      },
+      {
+        "name": "Zacian",
+        "dex": 888,
+        "win": "10.47%",
+        "top3": "35.30%",
+        "samples": 1595
+      },
+      {
+        "name": "Cresselia",
+        "dex": 488,
+        "win": "10.65%",
+        "top3": "35.82%",
+        "samples": 1502
+      },
+      {
+        "name": "Mesprit",
+        "dex": 481,
+        "win": "10.72%",
+        "top3": "35.83%",
+        "samples": 1521
+      },
+      {
+        "name": "Koraidon",
+        "dex": 1007,
+        "win": "10.73%",
+        "top3": "34.41%",
+        "samples": 1613
+      },
+      {
+        "name": "Salamence",
+        "dex": 373,
+        "win": "10.77%",
+        "top3": "33.56%",
+        "samples": 1615
+      },
+      {
+        "name": "Cosmoem",
+        "dex": 790,
+        "win": "10.85%",
+        "top3": "33.40%",
+        "samples": 1530
+      },
+      {
+        "name": "Kommo-o",
+        "dex": 784,
+        "win": "10.95%",
+        "top3": "36.50%",
+        "samples": 1589
+      }
+    ],
+    "overallHitsToKill": 3.6,
+    "totalKills": 142197,
+    "totalKillHitCount": 512489,
+    "fastestHitsToKill": [
+      {
+        "dex": 386,
+        "name": "Deoxys",
+        "avgHitsToKill": 3.23,
+        "avgHitsLanded": 5.25,
+        "avgAttackAttempts": 7.14,
+        "kills": 1496
+      },
+      {
+        "dex": 482,
+        "name": "Azelf",
+        "avgHitsToKill": 3.37,
+        "avgHitsLanded": 5.65,
+        "avgAttackAttempts": 7.61,
+        "kills": 1535
+      },
+      {
+        "dex": 491,
+        "name": "Darkrai",
+        "avgHitsToKill": 3.41,
+        "avgHitsLanded": 5.56,
+        "avgAttackAttempts": 7.57,
+        "kills": 1588
+      },
+      {
+        "dex": 645,
+        "name": "Landorus",
+        "avgHitsToKill": 3.43,
+        "avgHitsLanded": 5.73,
+        "avgAttackAttempts": 7.75,
+        "kills": 1537
+      },
+      {
+        "dex": 719,
+        "name": "Diancie",
+        "avgHitsToKill": 3.43,
+        "avgHitsLanded": 5.49,
+        "avgAttackAttempts": 7.42,
+        "kills": 1417
+      },
+      {
+        "dex": 786,
+        "name": "Tapu Lele",
+        "avgHitsToKill": 3.43,
+        "avgHitsLanded": 5.54,
+        "avgAttackAttempts": 7.45,
+        "kills": 1455
+      },
+      {
+        "dex": 1004,
+        "name": "Chi-Yu",
+        "avgHitsToKill": 3.43,
+        "avgHitsLanded": 5.37,
+        "avgAttackAttempts": 7.21,
+        "kills": 1466
+      },
+      {
+        "dex": 149,
+        "name": "Dragonite",
+        "avgHitsToKill": 3.44,
+        "avgHitsLanded": 5.69,
+        "avgAttackAttempts": 7.65,
+        "kills": 1526
+      }
+    ],
+    "slowestHitsToKill": [
+      {
+        "dex": 895,
+        "name": "Regidrago",
+        "avgHitsToKill": 3.85,
+        "avgHitsLanded": 5.93,
+        "avgAttackAttempts": 7.99,
+        "kills": 1349
+      },
+      {
+        "dex": 488,
+        "name": "Cresselia",
+        "avgHitsToKill": 3.85,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.7,
+        "kills": 1215
+      },
+      {
+        "dex": 151,
+        "name": "Mew",
+        "avgHitsToKill": 3.84,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.71,
+        "kills": 1269
+      },
+      {
+        "dex": 1024,
+        "name": "Terapagos",
+        "avgHitsToKill": 3.77,
+        "avgHitsLanded": 5.7,
+        "avgAttackAttempts": 7.69,
+        "kills": 1275
+      },
+      {
+        "dex": 790,
+        "name": "Cosmoem",
+        "avgHitsToKill": 3.76,
+        "avgHitsLanded": 5.63,
+        "avgAttackAttempts": 7.56,
+        "kills": 1197
+      },
+      {
+        "dex": 789,
+        "name": "Cosmog",
+        "avgHitsToKill": 3.76,
+        "avgHitsLanded": 5.65,
+        "avgAttackAttempts": 7.59,
+        "kills": 1229
+      },
+      {
+        "dex": 487,
+        "name": "Giratina",
+        "avgHitsToKill": 3.75,
+        "avgHitsLanded": 5.84,
+        "avgAttackAttempts": 7.82,
+        "kills": 1333
+      },
+      {
+        "dex": 385,
+        "name": "Jirachi",
+        "avgHitsToKill": 3.75,
+        "avgHitsLanded": 5.81,
+        "avgAttackAttempts": 7.75,
+        "kills": 1357
+      }
+    ],
+    "byRole": [
+      {
+        "dex": 386,
+        "name": "Deoxys",
+        "avgHitsToKill": 3.23,
+        "avgHitsLanded": 5.25,
+        "avgAttackAttempts": 7.14,
+        "kills": 1496
+      },
+      {
+        "dex": 482,
+        "name": "Azelf",
+        "avgHitsToKill": 3.37,
+        "avgHitsLanded": 5.65,
+        "avgAttackAttempts": 7.61,
+        "kills": 1535
+      },
+      {
+        "dex": 491,
+        "name": "Darkrai",
+        "avgHitsToKill": 3.41,
+        "avgHitsLanded": 5.56,
+        "avgAttackAttempts": 7.57,
+        "kills": 1588
+      },
+      {
+        "dex": 645,
+        "name": "Landorus",
+        "avgHitsToKill": 3.43,
+        "avgHitsLanded": 5.73,
+        "avgAttackAttempts": 7.75,
+        "kills": 1537
+      },
+      {
+        "dex": 719,
+        "name": "Diancie",
+        "avgHitsToKill": 3.43,
+        "avgHitsLanded": 5.49,
+        "avgAttackAttempts": 7.42,
+        "kills": 1417
+      },
+      {
+        "dex": 786,
+        "name": "Tapu Lele",
+        "avgHitsToKill": 3.43,
+        "avgHitsLanded": 5.54,
+        "avgAttackAttempts": 7.45,
+        "kills": 1455
+      },
+      {
+        "dex": 1004,
+        "name": "Chi-Yu",
+        "avgHitsToKill": 3.43,
+        "avgHitsLanded": 5.37,
+        "avgAttackAttempts": 7.21,
+        "kills": 1466
+      },
+      {
+        "dex": 149,
+        "name": "Dragonite",
+        "avgHitsToKill": 3.44,
+        "avgHitsLanded": 5.69,
+        "avgAttackAttempts": 7.65,
+        "kills": 1526
+      },
+      {
+        "dex": 647,
+        "name": "Keldeo",
+        "avgHitsToKill": 3.44,
+        "avgHitsLanded": 5.61,
+        "avgAttackAttempts": 7.58,
+        "kills": 1465
+      },
+      {
+        "dex": 642,
+        "name": "Thundurus",
+        "avgHitsToKill": 3.46,
+        "avgHitsLanded": 5.68,
+        "avgAttackAttempts": 7.64,
+        "kills": 1512
+      },
+      {
+        "dex": 905,
+        "name": "Enamorus",
+        "avgHitsToKill": 3.46,
+        "avgHitsLanded": 5.5,
+        "avgAttackAttempts": 7.42,
+        "kills": 1423
+      },
+      {
+        "dex": 376,
+        "name": "Metagross",
+        "avgHitsToKill": 3.48,
+        "avgHitsLanded": 5.59,
+        "avgAttackAttempts": 7.5,
+        "kills": 1424
+      },
+      {
+        "dex": 720,
+        "name": "Hoopa",
+        "avgHitsToKill": 3.48,
+        "avgHitsLanded": 5.36,
+        "avgAttackAttempts": 7.24,
+        "kills": 1293
+      },
+      {
+        "dex": 484,
+        "name": "Palkia",
+        "avgHitsToKill": 3.49,
+        "avgHitsLanded": 5.58,
+        "avgAttackAttempts": 7.48,
+        "kills": 1448
+      },
+      {
+        "dex": 721,
+        "name": "Volcanion",
+        "avgHitsToKill": 3.49,
+        "avgHitsLanded": 5.52,
+        "avgAttackAttempts": 7.48,
+        "kills": 1384
+      },
+      {
+        "dex": 787,
+        "name": "Tapu Bulu",
+        "avgHitsToKill": 3.49,
+        "avgHitsLanded": 5.54,
+        "avgAttackAttempts": 7.44,
+        "kills": 1478
+      },
+      {
+        "dex": 785,
+        "name": "Tapu Koko",
+        "avgHitsToKill": 3.5,
+        "avgHitsLanded": 5.66,
+        "avgAttackAttempts": 7.58,
+        "kills": 1482
+      },
+      {
+        "dex": 889,
+        "name": "Zamazenta",
+        "avgHitsToKill": 3.5,
+        "avgHitsLanded": 5.65,
+        "avgAttackAttempts": 7.63,
+        "kills": 1426
+      },
+      {
+        "dex": 145,
+        "name": "Zapdos",
+        "avgHitsToKill": 3.51,
+        "avgHitsLanded": 5.68,
+        "avgAttackAttempts": 7.66,
+        "kills": 1447
+      },
+      {
+        "dex": 998,
+        "name": "Baxcalibur",
+        "avgHitsToKill": 3.51,
+        "avgHitsLanded": 5.71,
+        "avgAttackAttempts": 7.74,
+        "kills": 1391
+      },
+      {
+        "dex": 706,
+        "name": "Goodra",
+        "avgHitsToKill": 3.52,
+        "avgHitsLanded": 5.71,
+        "avgAttackAttempts": 7.7,
+        "kills": 1513
+      },
+      {
+        "dex": 808,
+        "name": "Meltan",
+        "avgHitsToKill": 3.52,
+        "avgHitsLanded": 5.62,
+        "avgAttackAttempts": 7.64,
+        "kills": 1450
+      },
+      {
+        "dex": 1017,
+        "name": "Ogerpon",
+        "avgHitsToKill": 3.52,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.61,
+        "kills": 1536
+      },
+      {
+        "dex": 644,
+        "name": "Zekrom",
+        "avgHitsToKill": 3.53,
+        "avgHitsLanded": 5.66,
+        "avgAttackAttempts": 7.62,
+        "kills": 1410
+      },
+      {
+        "dex": 649,
+        "name": "Genesect",
+        "avgHitsToKill": 3.53,
+        "avgHitsLanded": 5.64,
+        "avgAttackAttempts": 7.54,
+        "kills": 1545
+      },
+      {
+        "dex": 641,
+        "name": "Tornadus",
+        "avgHitsToKill": 3.54,
+        "avgHitsLanded": 5.54,
+        "avgAttackAttempts": 7.54,
+        "kills": 1364
+      },
+      {
+        "dex": 802,
+        "name": "Marshadow",
+        "avgHitsToKill": 3.54,
+        "avgHitsLanded": 5.64,
+        "avgAttackAttempts": 7.6,
+        "kills": 1317
+      },
+      {
+        "dex": 1006,
+        "name": "Ferropaladín",
+        "avgHitsToKill": 3.54,
+        "avgHitsLanded": 5.42,
+        "avgAttackAttempts": 7.28,
+        "kills": 1253
+      },
+      {
+        "dex": 1010,
+        "name": "Ferroverdor",
+        "avgHitsToKill": 3.54,
+        "avgHitsLanded": 5.63,
+        "avgAttackAttempts": 7.55,
+        "kills": 1422
+      },
+      {
+        "dex": 639,
+        "name": "Terrakion",
+        "avgHitsToKill": 3.55,
+        "avgHitsLanded": 5.67,
+        "avgAttackAttempts": 7.6,
+        "kills": 1395
+      },
+      {
+        "dex": 643,
+        "name": "Reshiram",
+        "avgHitsToKill": 3.55,
+        "avgHitsLanded": 5.69,
+        "avgAttackAttempts": 7.65,
+        "kills": 1439
+      },
+      {
+        "dex": 896,
+        "name": "Glastrier",
+        "avgHitsToKill": 3.55,
+        "avgHitsLanded": 5.62,
+        "avgAttackAttempts": 7.54,
+        "kills": 1404
+      },
+      {
+        "dex": 243,
+        "name": "Raikou",
+        "avgHitsToKill": 3.56,
+        "avgHitsLanded": 5.68,
+        "avgAttackAttempts": 7.68,
+        "kills": 1390
+      },
+      {
+        "dex": 384,
+        "name": "Rayquaza",
+        "avgHitsToKill": 3.56,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.68,
+        "kills": 1459
+      },
+      {
+        "dex": 788,
+        "name": "Tapu Fini",
+        "avgHitsToKill": 3.56,
+        "avgHitsLanded": 5.71,
+        "avgAttackAttempts": 7.67,
+        "kills": 1447
+      },
+      {
+        "dex": 894,
+        "name": "Regieleki",
+        "avgHitsToKill": 3.56,
+        "avgHitsLanded": 5.73,
+        "avgAttackAttempts": 7.78,
+        "kills": 1464
+      },
+      {
+        "dex": 486,
+        "name": "Regigigas",
+        "avgHitsToKill": 3.57,
+        "avgHitsLanded": 5.68,
+        "avgAttackAttempts": 7.6,
+        "kills": 1455
+      },
+      {
+        "dex": 801,
+        "name": "Magearna",
+        "avgHitsToKill": 3.58,
+        "avgHitsLanded": 5.53,
+        "avgAttackAttempts": 7.44,
+        "kills": 1336
+      },
+      {
+        "dex": 380,
+        "name": "Latias",
+        "avgHitsToKill": 3.59,
+        "avgHitsLanded": 5.68,
+        "avgAttackAttempts": 7.59,
+        "kills": 1378
+      },
+      {
+        "dex": 800,
+        "name": "Necrozma",
+        "avgHitsToKill": 3.59,
+        "avgHitsLanded": 5.58,
+        "avgAttackAttempts": 7.54,
+        "kills": 1319
+      },
+      {
+        "dex": 1007,
+        "name": "Koraidon",
+        "avgHitsToKill": 3.59,
+        "avgHitsLanded": 5.62,
+        "avgAttackAttempts": 7.62,
+        "kills": 1403
+      },
+      {
+        "dex": 250,
+        "name": "Ho-Oh",
+        "avgHitsToKill": 3.6,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.71,
+        "kills": 1466
+      },
+      {
+        "dex": 383,
+        "name": "Groudon",
+        "avgHitsToKill": 3.6,
+        "avgHitsLanded": 5.58,
+        "avgAttackAttempts": 7.49,
+        "kills": 1331
+      },
+      {
+        "dex": 717,
+        "name": "Yveltal",
+        "avgHitsToKill": 3.6,
+        "avgHitsLanded": 5.78,
+        "avgAttackAttempts": 7.78,
+        "kills": 1459
+      },
+      {
+        "dex": 897,
+        "name": "Spectrier",
+        "avgHitsToKill": 3.6,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.65,
+        "kills": 1444
+      },
+      {
+        "dex": 485,
+        "name": "Heatran",
+        "avgHitsToKill": 3.61,
+        "avgHitsLanded": 5.64,
+        "avgAttackAttempts": 7.64,
+        "kills": 1356
+      },
+      {
+        "dex": 490,
+        "name": "Manaphy",
+        "avgHitsToKill": 3.61,
+        "avgHitsLanded": 5.61,
+        "avgAttackAttempts": 7.71,
+        "kills": 1308
+      },
+      {
+        "dex": 809,
+        "name": "Melmetal",
+        "avgHitsToKill": 3.61,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.7,
+        "kills": 1396
+      },
+      {
+        "dex": 891,
+        "name": "Kubfu",
+        "avgHitsToKill": 3.61,
+        "avgHitsLanded": 5.53,
+        "avgAttackAttempts": 7.49,
+        "kills": 1301
+      },
+      {
+        "dex": 150,
+        "name": "Mewtwo",
+        "avgHitsToKill": 3.62,
+        "avgHitsLanded": 5.63,
+        "avgAttackAttempts": 7.56,
+        "kills": 1276
+      },
+      {
+        "dex": 493,
+        "name": "Arceus",
+        "avgHitsToKill": 3.62,
+        "avgHitsLanded": 5.76,
+        "avgAttackAttempts": 7.79,
+        "kills": 1383
+      },
+      {
+        "dex": 784,
+        "name": "Kommo-o",
+        "avgHitsToKill": 3.62,
+        "avgHitsLanded": 5.58,
+        "avgAttackAttempts": 7.57,
+        "kills": 1378
+      },
+      {
+        "dex": 1009,
+        "name": "Ondulagua",
+        "avgHitsToKill": 3.62,
+        "avgHitsLanded": 5.65,
+        "avgAttackAttempts": 7.65,
+        "kills": 1319
+      },
+      {
+        "dex": 146,
+        "name": "Moltres",
+        "avgHitsToKill": 3.63,
+        "avgHitsLanded": 5.55,
+        "avgAttackAttempts": 7.53,
+        "kills": 1337
+      },
+      {
+        "dex": 251,
+        "name": "Celebi",
+        "avgHitsToKill": 3.63,
+        "avgHitsLanded": 5.75,
+        "avgAttackAttempts": 7.76,
+        "kills": 1335
+      },
+      {
+        "dex": 381,
+        "name": "Latios",
+        "avgHitsToKill": 3.63,
+        "avgHitsLanded": 5.6,
+        "avgAttackAttempts": 7.57,
+        "kills": 1410
+      },
+      {
+        "dex": 807,
+        "name": "Zeraora",
+        "avgHitsToKill": 3.63,
+        "avgHitsLanded": 5.69,
+        "avgAttackAttempts": 7.58,
+        "kills": 1369
+      },
+      {
+        "dex": 887,
+        "name": "Dragapult",
+        "avgHitsToKill": 3.63,
+        "avgHitsLanded": 5.61,
+        "avgAttackAttempts": 7.59,
+        "kills": 1366
+      },
+      {
+        "dex": 892,
+        "name": "Urshifu",
+        "avgHitsToKill": 3.63,
+        "avgHitsLanded": 5.62,
+        "avgAttackAttempts": 7.59,
+        "kills": 1316
+      },
+      {
+        "dex": 1015,
+        "name": "Munkidori",
+        "avgHitsToKill": 3.63,
+        "avgHitsLanded": 5.67,
+        "avgAttackAttempts": 7.55,
+        "kills": 1386
+      },
+      {
+        "dex": 144,
+        "name": "Articuno",
+        "avgHitsToKill": 3.64,
+        "avgHitsLanded": 5.71,
+        "avgAttackAttempts": 7.68,
+        "kills": 1397
+      },
+      {
+        "dex": 445,
+        "name": "Garchomp",
+        "avgHitsToKill": 3.64,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.7,
+        "kills": 1417
+      },
+      {
+        "dex": 635,
+        "name": "Hydreigon",
+        "avgHitsToKill": 3.64,
+        "avgHitsLanded": 5.62,
+        "avgAttackAttempts": 7.53,
+        "kills": 1369
+      },
+      {
+        "dex": 792,
+        "name": "Lunala",
+        "avgHitsToKill": 3.64,
+        "avgHitsLanded": 5.85,
+        "avgAttackAttempts": 7.9,
+        "kills": 1394
+      },
+      {
+        "dex": 1018,
+        "name": "Archaludon",
+        "avgHitsToKill": 3.64,
+        "avgHitsLanded": 5.63,
+        "avgAttackAttempts": 7.57,
+        "kills": 1356
+      },
+      {
+        "dex": 244,
+        "name": "Entei",
+        "avgHitsToKill": 3.65,
+        "avgHitsLanded": 5.74,
+        "avgAttackAttempts": 7.74,
+        "kills": 1354
+      },
+      {
+        "dex": 382,
+        "name": "Kyogre",
+        "avgHitsToKill": 3.65,
+        "avgHitsLanded": 5.52,
+        "avgAttackAttempts": 7.47,
+        "kills": 1298
+      },
+      {
+        "dex": 480,
+        "name": "Uxie",
+        "avgHitsToKill": 3.65,
+        "avgHitsLanded": 5.69,
+        "avgAttackAttempts": 7.73,
+        "kills": 1320
+      },
+      {
+        "dex": 483,
+        "name": "Dialga",
+        "avgHitsToKill": 3.65,
+        "avgHitsLanded": 5.6,
+        "avgAttackAttempts": 7.52,
+        "kills": 1231
+      },
+      {
+        "dex": 489,
+        "name": "Phione",
+        "avgHitsToKill": 3.66,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.76,
+        "kills": 1336
+      },
+      {
+        "dex": 377,
+        "name": "Regirock",
+        "avgHitsToKill": 3.67,
+        "avgHitsLanded": 5.56,
+        "avgAttackAttempts": 7.56,
+        "kills": 1279
+      },
+      {
+        "dex": 640,
+        "name": "Virizion",
+        "avgHitsToKill": 3.67,
+        "avgHitsLanded": 5.74,
+        "avgAttackAttempts": 7.65,
+        "kills": 1395
+      },
+      {
+        "dex": 648,
+        "name": "Meloetta",
+        "avgHitsToKill": 3.67,
+        "avgHitsLanded": 5.71,
+        "avgAttackAttempts": 7.64,
+        "kills": 1449
+      },
+      {
+        "dex": 716,
+        "name": "Xerneas",
+        "avgHitsToKill": 3.67,
+        "avgHitsLanded": 5.93,
+        "avgAttackAttempts": 7.88,
+        "kills": 1541
+      },
+      {
+        "dex": 1005,
+        "name": "Bramaluna",
+        "avgHitsToKill": 3.67,
+        "avgHitsLanded": 5.6,
+        "avgAttackAttempts": 7.58,
+        "kills": 1282
+      },
+      {
+        "dex": 718,
+        "name": "Zygarde",
+        "avgHitsToKill": 3.68,
+        "avgHitsLanded": 5.84,
+        "avgAttackAttempts": 7.89,
+        "kills": 1367
+      },
+      {
+        "dex": 890,
+        "name": "Eternatus",
+        "avgHitsToKill": 3.68,
+        "avgHitsLanded": 5.84,
+        "avgAttackAttempts": 7.86,
+        "kills": 1454
+      },
+      {
+        "dex": 638,
+        "name": "Cobalion",
+        "avgHitsToKill": 3.69,
+        "avgHitsLanded": 5.68,
+        "avgAttackAttempts": 7.75,
+        "kills": 1327
+      },
+      {
+        "dex": 494,
+        "name": "Victini",
+        "avgHitsToKill": 3.7,
+        "avgHitsLanded": 5.8,
+        "avgAttackAttempts": 7.8,
+        "kills": 1427
+      },
+      {
+        "dex": 772,
+        "name": "Código Cero",
+        "avgHitsToKill": 3.7,
+        "avgHitsLanded": 5.74,
+        "avgAttackAttempts": 7.71,
+        "kills": 1408
+      },
+      {
+        "dex": 791,
+        "name": "Solgaleo",
+        "avgHitsToKill": 3.7,
+        "avgHitsLanded": 5.69,
+        "avgAttackAttempts": 7.78,
+        "kills": 1367
+      },
+      {
+        "dex": 1016,
+        "name": "Fezandipiti",
+        "avgHitsToKill": 3.7,
+        "avgHitsLanded": 5.71,
+        "avgAttackAttempts": 7.65,
+        "kills": 1341
+      },
+      {
+        "dex": 373,
+        "name": "Salamence",
+        "avgHitsToKill": 3.71,
+        "avgHitsLanded": 5.62,
+        "avgAttackAttempts": 7.55,
+        "kills": 1319
+      },
+      {
+        "dex": 481,
+        "name": "Mesprit",
+        "avgHitsToKill": 3.71,
+        "avgHitsLanded": 5.61,
+        "avgAttackAttempts": 7.61,
+        "kills": 1277
+      },
+      {
+        "dex": 773,
+        "name": "Silvally",
+        "avgHitsToKill": 3.71,
+        "avgHitsLanded": 5.69,
+        "avgAttackAttempts": 7.76,
+        "kills": 1305
+      },
+      {
+        "dex": 888,
+        "name": "Zacian",
+        "avgHitsToKill": 3.71,
+        "avgHitsLanded": 5.59,
+        "avgAttackAttempts": 7.58,
+        "kills": 1295
+      },
+      {
+        "dex": 245,
+        "name": "Suicune",
+        "avgHitsToKill": 3.72,
+        "avgHitsLanded": 5.8,
+        "avgAttackAttempts": 7.78,
+        "kills": 1357
+      },
+      {
+        "dex": 646,
+        "name": "Kyurem",
+        "avgHitsToKill": 3.72,
+        "avgHitsLanded": 5.76,
+        "avgAttackAttempts": 7.75,
+        "kills": 1307
+      },
+      {
+        "dex": 898,
+        "name": "Calyrex",
+        "avgHitsToKill": 3.72,
+        "avgHitsLanded": 5.65,
+        "avgAttackAttempts": 7.66,
+        "kills": 1306
+      },
+      {
+        "dex": 248,
+        "name": "Tyranitar",
+        "avgHitsToKill": 3.73,
+        "avgHitsLanded": 5.65,
+        "avgAttackAttempts": 7.56,
+        "kills": 1321
+      },
+      {
+        "dex": 379,
+        "name": "Registeel",
+        "avgHitsToKill": 3.73,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.74,
+        "kills": 1325
+      },
+      {
+        "dex": 249,
+        "name": "Lugia",
+        "avgHitsToKill": 3.74,
+        "avgHitsLanded": 5.78,
+        "avgAttackAttempts": 7.83,
+        "kills": 1332
+      },
+      {
+        "dex": 289,
+        "name": "Slaking",
+        "avgHitsToKill": 3.74,
+        "avgHitsLanded": 5.76,
+        "avgAttackAttempts": 7.79,
+        "kills": 1367
+      },
+      {
+        "dex": 492,
+        "name": "Shaymin",
+        "avgHitsToKill": 3.74,
+        "avgHitsLanded": 5.76,
+        "avgAttackAttempts": 7.69,
+        "kills": 1351
+      },
+      {
+        "dex": 378,
+        "name": "Regice",
+        "avgHitsToKill": 3.75,
+        "avgHitsLanded": 5.48,
+        "avgAttackAttempts": 7.43,
+        "kills": 1174
+      },
+      {
+        "dex": 385,
+        "name": "Jirachi",
+        "avgHitsToKill": 3.75,
+        "avgHitsLanded": 5.81,
+        "avgAttackAttempts": 7.75,
+        "kills": 1357
+      },
+      {
+        "dex": 487,
+        "name": "Giratina",
+        "avgHitsToKill": 3.75,
+        "avgHitsLanded": 5.84,
+        "avgAttackAttempts": 7.82,
+        "kills": 1333
+      },
+      {
+        "dex": 789,
+        "name": "Cosmog",
+        "avgHitsToKill": 3.76,
+        "avgHitsLanded": 5.65,
+        "avgAttackAttempts": 7.59,
+        "kills": 1229
+      },
+      {
+        "dex": 790,
+        "name": "Cosmoem",
+        "avgHitsToKill": 3.76,
+        "avgHitsLanded": 5.63,
+        "avgAttackAttempts": 7.56,
+        "kills": 1197
+      },
+      {
+        "dex": 1024,
+        "name": "Terapagos",
+        "avgHitsToKill": 3.77,
+        "avgHitsLanded": 5.7,
+        "avgAttackAttempts": 7.69,
+        "kills": 1275
+      },
+      {
+        "dex": 151,
+        "name": "Mew",
+        "avgHitsToKill": 3.84,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.71,
+        "kills": 1269
+      },
+      {
+        "dex": 488,
+        "name": "Cresselia",
+        "avgHitsToKill": 3.85,
+        "avgHitsLanded": 5.72,
+        "avgAttackAttempts": 7.7,
+        "kills": 1215
+      },
+      {
+        "dex": 895,
+        "name": "Regidrago",
+        "avgHitsToKill": 3.85,
+        "avgHitsLanded": 5.93,
+        "avgAttackAttempts": 7.99,
+        "kills": 1349
+      }
+    ]
+  },
+  "strongestBefore": [
+    {
+      "name": "Slaking",
+      "dex": 289,
+      "win": "17.68%",
+      "top3": "49.46%",
+      "samples": 1567
+    },
+    {
+      "name": "Regigigas",
+      "dex": 486,
+      "win": "17.06%",
+      "top3": "48.42%",
+      "samples": 1553
+    },
+    {
+      "name": "Mewtwo",
+      "dex": 150,
+      "win": "16.99%",
+      "top3": "44.16%",
+      "samples": 1583
+    },
+    {
+      "name": "Lunala",
+      "dex": 792,
+      "win": "16.73%",
+      "top3": "44.21%",
+      "samples": 1554
+    },
+    {
+      "name": "Kyogre",
+      "dex": 382,
+      "win": "16.71%",
+      "top3": "44.88%",
+      "samples": 1622
+    },
+    {
+      "name": "Melmetal",
+      "dex": 809,
+      "win": "16.61%",
+      "top3": "45.90%",
+      "samples": 1523
+    },
+    {
+      "name": "Eternatus",
+      "dex": 890,
+      "win": "16.58%",
+      "top3": "46.78%",
+      "samples": 1520
+    },
+    {
+      "name": "Regidrago",
+      "dex": 895,
+      "win": "16.22%",
+      "top3": "48.11%",
+      "samples": 1584
+    }
+  ],
+  "weakestBefore": [
+    {
+      "name": "Cosmog",
+      "dex": 789,
+      "win": "5.65%",
+      "top3": "19.16%",
+      "samples": 1576
+    },
+    {
+      "name": "Meltan",
+      "dex": 808,
+      "win": "6.16%",
+      "top3": "25.68%",
+      "samples": 1608
+    },
+    {
+      "name": "Cosmoem",
+      "dex": 790,
+      "win": "6.41%",
+      "top3": "21.42%",
+      "samples": 1545
+    },
+    {
+      "name": "Tapu Fini",
+      "dex": 788,
+      "win": "8.50%",
+      "top3": "30.14%",
+      "samples": 1589
+    },
+    {
+      "name": "Uxie",
+      "dex": 480,
+      "win": "8.72%",
+      "top3": "28.54%",
+      "samples": 1605
+    },
+    {
+      "name": "Silvally",
+      "dex": 773,
+      "win": "8.80%",
+      "top3": "33.77%",
+      "samples": 1534
+    },
+    {
+      "name": "Genesect",
+      "dex": 649,
+      "win": "8.94%",
+      "top3": "32.77%",
+      "samples": 1544
+    },
+    {
+      "name": "Diancie",
+      "dex": 719,
+      "win": "8.97%",
+      "top3": "25.60%",
+      "samples": 1594
+    }
+  ],
+  "strongestAfter": [
+    {
+      "name": "Tapu Koko",
+      "dex": 785,
+      "win": "14.09%",
+      "top3": "38.68%",
+      "samples": 3074
+    },
+    {
+      "name": "Chi-Yu",
+      "dex": 1004,
+      "win": "14.07%",
+      "top3": "38.20%",
+      "samples": 3092
+    },
+    {
+      "name": "Thundurus",
+      "dex": 642,
+      "win": "14.01%",
+      "top3": "39.09%",
+      "samples": 3006
+    },
+    {
+      "name": "Genesect",
+      "dex": 649,
+      "win": "13.95%",
+      "top3": "41.23%",
+      "samples": 3061
+    },
+    {
+      "name": "Melmetal",
+      "dex": 809,
+      "win": "13.90%",
+      "top3": "39.13%",
+      "samples": 3072
+    },
+    {
+      "name": "Volcanion",
+      "dex": 721,
+      "win": "13.83%",
+      "top3": "38.69%",
+      "samples": 3130
+    },
+    {
+      "name": "Deoxys",
+      "dex": 386,
+      "win": "13.71%",
+      "top3": "38.84%",
+      "samples": 3136
+    },
+    {
+      "name": "Tapu Bulu",
+      "dex": 787,
+      "win": "13.62%",
+      "top3": "38.06%",
+      "samples": 3032
+    }
+  ],
+  "weakestAfter": [
+    {
+      "name": "Cosmog",
+      "dex": 789,
+      "win": "10.62%",
+      "top3": "34.22%",
+      "samples": 3118
+    },
+    {
+      "name": "Cosmoem",
+      "dex": 790,
+      "win": "10.99%",
+      "top3": "35.87%",
+      "samples": 3086
+    },
+    {
+      "name": "Regigigas",
+      "dex": 486,
+      "win": "11.16%",
+      "top3": "36.63%",
+      "samples": 3082
+    },
+    {
+      "name": "Garchomp",
+      "dex": 445,
+      "win": "11.26%",
+      "top3": "37.29%",
+      "samples": 3038
+    },
+    {
+      "name": "Mewtwo",
+      "dex": 150,
+      "win": "11.27%",
+      "top3": "35.79%",
+      "samples": 3124
+    },
+    {
+      "name": "Glastrier",
+      "dex": 896,
+      "win": "11.42%",
+      "top3": "36.36%",
+      "samples": 3127
+    },
+    {
+      "name": "Articuno",
+      "dex": 144,
+      "win": "11.46%",
+      "top3": "37.33%",
+      "samples": 3019
+    },
+    {
+      "name": "Palkia",
+      "dex": 484,
+      "win": "11.56%",
+      "top3": "35.64%",
+      "samples": 3140
+    }
+  ],
+  "arenaMultipliers": [
+    {
+      "dex": 144,
+      "name": "Articuno",
+      "multiplier": 1.0307
+    },
+    {
+      "dex": 145,
+      "name": "Zapdos",
+      "multiplier": 1.0073
+    },
+    {
+      "dex": 146,
+      "name": "Moltres",
+      "multiplier": 0.9879
+    },
+    {
+      "dex": 149,
+      "name": "Dragonite",
+      "multiplier": 0.9935
+    },
+    {
+      "dex": 150,
+      "name": "Mewtwo",
+      "multiplier": 0.9386
+    },
+    {
+      "dex": 151,
+      "name": "Mew",
+      "multiplier": 0.9984
+    },
+    {
+      "dex": 243,
+      "name": "Raikou",
+      "multiplier": 1.0121
+    },
+    {
+      "dex": 244,
+      "name": "Entei",
+      "multiplier": 0.9951
+    },
+    {
+      "dex": 245,
+      "name": "Suicune",
+      "multiplier": 1.0137
+    },
+    {
+      "dex": 248,
+      "name": "Tyranitar",
+      "multiplier": 0.9676
+    },
+    {
+      "dex": 249,
+      "name": "Lugia",
+      "multiplier": 1.0142
+    },
+    {
+      "dex": 250,
+      "name": "Ho-Oh",
+      "multiplier": 0.9764
+    },
+    {
+      "dex": 251,
+      "name": "Celebi",
+      "multiplier": 1.0202
+    },
+    {
+      "dex": 289,
+      "name": "Slaking",
+      "multiplier": 0.9175
+    },
+    {
+      "dex": 373,
+      "name": "Salamence",
+      "multiplier": 0.9665
+    },
+    {
+      "dex": 376,
+      "name": "Metagross",
+      "multiplier": 0.995
+    },
+    {
+      "dex": 377,
+      "name": "Regirock",
+      "multiplier": 1.0193
+    },
+    {
+      "dex": 378,
+      "name": "Regice",
+      "multiplier": 1.0157
+    },
+    {
+      "dex": 379,
+      "name": "Registeel",
+      "multiplier": 1.0569
+    },
+    {
+      "dex": 380,
+      "name": "Latias",
+      "multiplier": 1.0279
+    },
+    {
+      "dex": 381,
+      "name": "Latios",
+      "multiplier": 0.9941
+    },
+    {
+      "dex": 382,
+      "name": "Kyogre",
+      "multiplier": 0.951
+    },
+    {
+      "dex": 383,
+      "name": "Groudon",
+      "multiplier": 0.9523
+    },
+    {
+      "dex": 384,
+      "name": "Rayquaza",
+      "multiplier": 0.9544
+    },
+    {
+      "dex": 385,
+      "name": "Jirachi",
+      "multiplier": 1.019
+    },
+    {
+      "dex": 386,
+      "name": "Deoxys",
+      "multiplier": 1.0354
+    },
+    {
+      "dex": 445,
+      "name": "Garchomp",
+      "multiplier": 0.9753
+    },
+    {
+      "dex": 480,
+      "name": "Uxie",
+      "multiplier": 1.0802
+    },
+    {
+      "dex": 481,
+      "name": "Mesprit",
+      "multiplier": 1.03
+    },
+    {
+      "dex": 482,
+      "name": "Azelf",
+      "multiplier": 1.0336
+    },
+    {
+      "dex": 483,
+      "name": "Dialga",
+      "multiplier": 0.9602
+    },
+    {
+      "dex": 484,
+      "name": "Palkia",
+      "multiplier": 0.9684
+    },
+    {
+      "dex": 485,
+      "name": "Heatran",
+      "multiplier": 0.9839
+    },
+    {
+      "dex": 486,
+      "name": "Regigigas",
+      "multiplier": 0.9298
+    },
+    {
+      "dex": 487,
+      "name": "Giratina",
+      "multiplier": 0.9911
+    },
+    {
+      "dex": 488,
+      "name": "Cresselia",
+      "multiplier": 1.0118
+    },
+    {
+      "dex": 489,
+      "name": "Phione",
+      "multiplier": 1.0499
+    },
+    {
+      "dex": 490,
+      "name": "Manaphy",
+      "multiplier": 1.0158
+    },
+    {
+      "dex": 491,
+      "name": "Darkrai",
+      "multiplier": 1.0215
+    },
+    {
+      "dex": 492,
+      "name": "Shaymin",
+      "multiplier": 1.0183
+    },
+    {
+      "dex": 493,
+      "name": "Arceus",
+      "multiplier": 0.9818
+    },
+    {
+      "dex": 494,
+      "name": "Victini",
+      "multiplier": 1.0225
+    },
+    {
+      "dex": 635,
+      "name": "Hydreigon",
+      "multiplier": 0.988
+    },
+    {
+      "dex": 638,
+      "name": "Cobalion",
+      "multiplier": 1.0293
+    },
+    {
+      "dex": 639,
+      "name": "Terrakion",
+      "multiplier": 0.9837
+    },
+    {
+      "dex": 640,
+      "name": "Virizion",
+      "multiplier": 1.0153
+    },
+    {
+      "dex": 641,
+      "name": "Tornadus",
+      "multiplier": 1.0111
+    },
+    {
+      "dex": 642,
+      "name": "Thundurus",
+      "multiplier": 1.0206
+    },
+    {
+      "dex": 643,
+      "name": "Reshiram",
+      "multiplier": 0.972
+    },
+    {
+      "dex": 644,
+      "name": "Zekrom",
+      "multiplier": 0.9612
+    },
+    {
+      "dex": 645,
+      "name": "Landorus",
+      "multiplier": 1.0169
+    },
+    {
+      "dex": 646,
+      "name": "Kyurem",
+      "multiplier": 0.9638
+    },
+    {
+      "dex": 647,
+      "name": "Keldeo",
+      "multiplier": 1.0001
+    },
+    {
+      "dex": 648,
+      "name": "Meloetta",
+      "multiplier": 0.9818
+    },
+    {
+      "dex": 649,
+      "name": "Genesect",
+      "multiplier": 1.0365
+    },
+    {
+      "dex": 706,
+      "name": "Goodra",
+      "multiplier": 1.0137
+    },
+    {
+      "dex": 716,
+      "name": "Xerneas",
+      "multiplier": 0.9673
+    },
+    {
+      "dex": 717,
+      "name": "Yveltal",
+      "multiplier": 0.9821
+    },
+    {
+      "dex": 718,
+      "name": "Zygarde",
+      "multiplier": 1.0177
+    },
+    {
+      "dex": 719,
+      "name": "Diancie",
+      "multiplier": 1.0877
+    },
+    {
+      "dex": 720,
+      "name": "Hoopa",
+      "multiplier": 0.9747
+    },
+    {
+      "dex": 721,
+      "name": "Volcanion",
+      "multiplier": 1.0115
+    },
+    {
+      "dex": 772,
+      "name": "Código Cero",
+      "multiplier": 1.0155
+    },
+    {
+      "dex": 773,
+      "name": "Silvally",
+      "multiplier": 1.0384
+    },
+    {
+      "dex": 784,
+      "name": "Kommo-o",
+      "multiplier": 1.0296
+    },
+    {
+      "dex": 785,
+      "name": "Tapu Koko",
+      "multiplier": 1.0457
+    },
+    {
+      "dex": 786,
+      "name": "Tapu Lele",
+      "multiplier": 1.0274
+    },
+    {
+      "dex": 787,
+      "name": "Tapu Bulu",
+      "multiplier": 1.0199
+    },
+    {
+      "dex": 788,
+      "name": "Tapu Fini",
+      "multiplier": 1.0702
+    },
+    {
+      "dex": 789,
+      "name": "Cosmog",
+      "multiplier": 1.1543
+    },
+    {
+      "dex": 790,
+      "name": "Cosmoem",
+      "multiplier": 1.1543
+    },
+    {
+      "dex": 791,
+      "name": "Solgaleo",
+      "multiplier": 0.9546
+    },
+    {
+      "dex": 792,
+      "name": "Lunala",
+      "multiplier": 0.9488
+    },
+    {
+      "dex": 800,
+      "name": "Necrozma",
+      "multiplier": 0.9775
+    },
+    {
+      "dex": 801,
+      "name": "Magearna",
+      "multiplier": 0.9902
+    },
+    {
+      "dex": 802,
+      "name": "Marshadow",
+      "multiplier": 1.0015
+    },
+    {
+      "dex": 807,
+      "name": "Zeraora",
+      "multiplier": 1.0155
+    },
+    {
+      "dex": 808,
+      "name": "Meltan",
+      "multiplier": 1.1367
+    },
+    {
+      "dex": 809,
+      "name": "Melmetal",
+      "multiplier": 0.9349
+    },
+    {
+      "dex": 887,
+      "name": "Dragapult",
+      "multiplier": 1.0085
+    },
+    {
+      "dex": 888,
+      "name": "Zacian",
+      "multiplier": 0.9888
+    },
+    {
+      "dex": 889,
+      "name": "Zamazenta",
+      "multiplier": 1.0064
+    },
+    {
+      "dex": 890,
+      "name": "Eternatus",
+      "multiplier": 0.9407
+    },
+    {
+      "dex": 891,
+      "name": "Kubfu",
+      "multiplier": 1.0693
+    },
+    {
+      "dex": 892,
+      "name": "Urshifu",
+      "multiplier": 0.9782
+    },
+    {
+      "dex": 894,
+      "name": "Regieleki",
+      "multiplier": 1.0531
+    },
+    {
+      "dex": 895,
+      "name": "Regidrago",
+      "multiplier": 0.9389
+    },
+    {
+      "dex": 896,
+      "name": "Glastrier",
+      "multiplier": 0.9554
+    },
+    {
+      "dex": 897,
+      "name": "Spectrier",
+      "multiplier": 0.9589
+    },
+    {
+      "dex": 898,
+      "name": "Calyrex",
+      "multiplier": 1.0174
+    },
+    {
+      "dex": 905,
+      "name": "Enamorus",
+      "multiplier": 1.0128
+    },
+    {
+      "dex": 998,
+      "name": "Baxcalibur",
+      "multiplier": 0.9584
+    },
+    {
+      "dex": 1004,
+      "name": "Chi-Yu",
+      "multiplier": 1.038
+    },
+    {
+      "dex": 1005,
+      "name": "Bramaluna",
+      "multiplier": 0.9677
+    },
+    {
+      "dex": 1006,
+      "name": "Ferropaladín",
+      "multiplier": 1.0014
+    },
+    {
+      "dex": 1007,
+      "name": "Koraidon",
+      "multiplier": 0.9652
+    },
+    {
+      "dex": 1009,
+      "name": "Ondulagua",
+      "multiplier": 0.9846
+    },
+    {
+      "dex": 1010,
+      "name": "Ferroverdor",
+      "multiplier": 0.9971
+    },
+    {
+      "dex": 1015,
+      "name": "Munkidori",
+      "multiplier": 0.9888
+    },
+    {
+      "dex": 1016,
+      "name": "Fezandipiti",
+      "multiplier": 1.0361
+    },
+    {
+      "dex": 1017,
+      "name": "Ogerpon",
+      "multiplier": 1.0245
+    },
+    {
+      "dex": 1018,
+      "name": "Archaludon",
+      "multiplier": 0.9951
+    },
+    {
+      "dex": 1024,
+      "name": "Terapagos",
+      "multiplier": 1.0393
+    }
+  ]
+}

@@ -81,6 +81,8 @@ G.DB = (() => {
       ach: {},                // id -> fecha: logros conseguidos
       missions: {},           // misiones del día / semana (systems/progress.js)
       profile: { favs: [], title: '' },   // perfil público: 3 favoritos y título
+      arenaStats: { runs: 0, feedbackVersion: '', feedbackSubmitted: false },
+      arenaNoticeSeenAt: 0,               // aviso del modo nuevo: una vez por cuenta
       stats: { runs: 0, bestTime: 0, bestLevel: 0, totalKills: 0, pulls: 0, coinsEarned: 0, shinies: 0,
                bossesTotal: 0, riftWins: 0, evolutions: 0, missionsDone: 0, groupRuns: 0, bestGroupTime: 0 }
     };
@@ -181,6 +183,11 @@ G.DB = (() => {
       r[coll] = r[coll] || {};
       for (const k in older[coll] || {}) if (!r[coll][k]) r[coll][k] = older[coll][k];
     }
+    const oa = older.arenaStats || {}, ra = r.arenaStats = r.arenaStats || {};
+    ra.runs = Math.max(Number(ra.runs) || 0, Number(oa.runs) || 0);
+    ra.feedbackSubmitted = !!(ra.feedbackSubmitted || oa.feedbackSubmitted);
+    if (!ra.feedbackVersion) ra.feedbackVersion = oa.feedbackVersion || '';
+    r.arenaNoticeSeenAt = Math.max(Number(r.arenaNoticeSeenAt) || 0, Number(older.arenaNoticeSeenAt) || 0);
     // Misiones del mismo día/semana: el mayor progreso y lo ya recogido.
     const mo = older.missions || {}, mr = r.missions = r.missions || {};
     for (const [per, list] of [['day', 'daily'], ['week', 'weekly']]) {
@@ -827,6 +834,47 @@ G.DB = (() => {
   function nameAccount() { return !!(auth && auth.currentUser && (auth.currentUser.email || '').endsWith('@' + NAME_DOMAIN)); }
 
   /**
+   * Returns whether the current Firebase user already has Google linked.
+   * Linking is deliberately checked against providerData instead of the
+   * account email: a name/password account keeps its internal email even
+   * after Google is linked, so changing that email would risk breaking the
+   * existing username -> Firebase UID mapping.
+   */
+  function googleLinked() {
+    const cu = auth && auth.currentUser;
+    return !!(cu && (cu.providerData || []).some(p => p && p.providerId === 'google.com'));
+  }
+
+  /**
+   * Link Google to the account that is already signed in.
+   *
+   * This must never call signInWithPopup: that would select/create another
+   * Firebase user. linkWithPopup preserves the current UID, which is also the
+   * key used by CF/D1 saves and Waffo grants. Firebase rejects a Google
+   * credential already owned by another UID; we surface that error and do not
+   * attempt an automatic merge.
+   */
+  async function linkGoogle() {
+    if (mode !== 'cloud' || guest || !auth || !auth.currentUser) {
+      return { ok: false, error: 'Inicia sesión con tu cuenta antes de vincular Google.' };
+    }
+    if (googleLinked()) return { ok: true, already: true };
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await auth.currentUser.linkWithPopup(provider);
+      await auth.currentUser.reload();
+      return { ok: true, already: false };
+    } catch (e) {
+      if (e && (e.code === 'auth/credential-already-in-use' || e.code === 'auth/provider-already-linked')) {
+        return { ok: false, error: e.code === 'auth/credential-already-in-use'
+          ? 'Ese Google ya está vinculado a otra cuenta. No se ha modificado nada.'
+          : 'Google ya está vinculado a esta cuenta.' };
+      }
+      return { ok: false, error: authError(e) };
+    }
+  }
+
+  /**
    * Borra la cuenta y la partida (en la nube o en este navegador).
    * @param pass  contraseña (cuentas de nombre y contraseña)
    */
@@ -891,7 +939,7 @@ G.DB = (() => {
   }
 
   return {
-    ready, register, login, loginWithGoogle, playAsGuest, logout, commit, deleteAccount, flush: pushNow, applyServerSave,
+    ready, register, login, loginWithGoogle, linkGoogle, playAsGuest, logout, commit, deleteAccount, flush: pushNow, applyServerSave,
     owns, grant, ownsShiny, grantShiny, merge, setName, upgradesOf,
     onSync(fn) { listeners.add(fn); },
     onLeave(fn) { leaveHooks.push(fn); },
@@ -901,6 +949,8 @@ G.DB = (() => {
     get online() { return mode === 'cloud' && !guest && !!uid && !!save; },
     /** ¿La cuenta es de usuario y contraseña (no de Google)? */
     get nameAccount() { return nameAccount(); },
+    /** ¿La cuenta actual tiene Google vinculado sin cambiar su UID? */
+    get googleLinked() { return googleLinked(); },
     get mode() { return mode; },
     get localReason() { return localReason; },
     get syncState() { return syncState; },

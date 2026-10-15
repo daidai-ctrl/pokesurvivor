@@ -35,6 +35,9 @@ G.Events = (() => {
   // ---------------- ciclo ----------------
 
   function update(dt, players, time) {
+    // Arena MVP keeps only ordinary monsters. Disable classic timed events,
+    // treasure thieves and rescue encounters for deterministic PvP matches.
+    if (G.Arena && G.Arena.active) return;
     if (cur) {
       cur.t += dt;
       if (cur.id !== 'lost' && cur.t >= cur.dur && authority()) end();

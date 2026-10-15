@@ -49,7 +49,7 @@ G.LoginUI = (() => {
     if (/^(?:www\.)?pokesurvivor\.xyz$/i.test(location.hostname || ''))
       return 'No se pudo iniciar la nube: las cuentas están temporalmente desactivadas. Puedes jugar como invitado, pero esa partida no se guarda.';
     const why = G.DB.localReason === 'file'
-      ? 'Abierto desde un archivo: la partida sólo se guarda en este navegador. Para guardar en la nube, juega en la versión publicada.'
+      ? 'Has abierto un archivo directamente (file://): Google y la nube no pueden iniciarse así. Abre el MVP con http://localhost:8765/dev.html para usar Google en la prueba local.'
       : G.DB.localReason === 'config'
         ? 'Nube sin configurar: la partida sólo se guarda en este navegador.'
         : 'No se pudo iniciar la nube: las cuentas están temporalmente desactivadas. Puedes jugar como invitado, pero esa partida no se guarda.';

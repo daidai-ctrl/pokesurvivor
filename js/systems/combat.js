@@ -25,7 +25,11 @@ G.Combat = (() => {
   }
 
   function tickMove(dt, pl, m, now) {
-    if (m.kind === 'orbit') { orbit(pl, m, dt, now); return; }
+    if (m.kind === 'orbit') {
+      orbit(pl, m, dt, now);
+      if (G.Arena && G.Arena.active) G.Arena.onOrbit(pl, m, dt, now);
+      return;
+    }
 
     m.t -= dt;
     if (m.t > 0) return;
@@ -42,6 +46,7 @@ G.Combat = (() => {
     m.castAt = performance.now();
 
     run(pl, m);
+    if (G.Arena && G.Arena.active) G.Arena.onCast(pl, m);
   }
 
   function run(pl, m) {
@@ -662,6 +667,10 @@ G.Combat = (() => {
     for (const e of G.EnemyMgr.queryCircle(pl.x, pl.y, pl.r + 40)) {
       if (G.U.dist2(e.x, e.y, pl.x, pl.y) > (e.r + pl.r) * (e.r + pl.r)) continue;
       if (e.touchCd > 0 || e.behavior === 'thief') continue;
+      // Arena walls must also block contact damage. Without this check, an
+      // enemy standing on the other side of a one-tile wall can be close
+      // enough by radius math to damage a player trapped in a corner.
+      if (G.Arena?.active && !G.Arena.hasLineOfSight(e, pl, 2)) continue;
       e.touchCd = 0.55;
       e.strike(pl);
       pl.hurt(e.dmg, e.atkType);

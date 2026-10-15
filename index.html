@@ -101,6 +101,8 @@
   </div>
 </div>
 <canvas id="game"></canvas>
+<!-- HUD del modo Arena: queda fuera de las pantallas de menú para seguir visible durante la partida. -->
+<aside id="arena-hud-scoreboard" class="arena-hud-scoreboard hidden" aria-live="polite" aria-label="Estado de la sala Arena"></aside>
 <!-- En móvil se juega en horizontal -->
 <div id="rotate" class="hidden"><div class="box center"><div id="rotate-ico"></div><h2>Gira el móvil</h2><p class="sub">PokéSurvivor se juega en horizontal.</p></div></div>
 
@@ -126,6 +128,7 @@
       <div class="row">
         <button id="btn-auth" class="btn gold grow" type="submit">Entrar</button>
       </div>
+      <p class="note center" id="login-recovery-note">Para proteger tu progreso: espera a ver «Guardado en la nube» y vincula Google desde Ajustes → Cuenta. Las cuentas de nombre y contraseña usan un correo interno que no recibe restablecimientos.</p>
     </form>
     <div class="row" style="margin-top:10px">
       <button id="btn-google" class="btn google grow hidden" type="button">Entrar con Google</button>
@@ -228,6 +231,7 @@
     <div class="box">
       <div class="menu-list">
         <button class="menu-item play" data-go="play">Jugar<small>Entra en la mazmorra</small></button>
+        <button class="menu-item arena-menu" data-go="arena"><span id="menu-arena-title">Último Superviviente</span><small id="menu-arena-subtitle">Battle Royale · 8 jugadores · 100 monedas</small></button>
         <button class="menu-item" data-go="dex">Pokémon<small id="menu-dex-count">Tu colección</small></button>
         <button class="menu-item" data-go="upgrades">Mejoras<small>Haz más fuerte cada run</small></button>
         <button class="menu-item" data-go="gacha">Gacha<small>9 regiones · Pokémon y shinies</small></button>
@@ -417,6 +421,149 @@
   </div>
 </section>
 
+<!-- ====== Aviso de prueba del nuevo modo ====== -->
+<section id="scr-arena-notice" class="scr dim hidden" aria-labelledby="arena-notice-title">
+  <div class="box arena-notice-box" role="dialog" aria-modal="true">
+    <div class="row between">
+      <div>
+        <h2 id="arena-notice-title">Nuevo modo: Último Superviviente</h2>
+        <p id="arena-notice-subtitle" class="sub" style="margin:4px 0 0">Battle Royale · 皇家生存战</p>
+      </div>
+      <button id="arena-notice-close" class="btn small ghost" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <p id="arena-notice-lead" class="arena-notice-lead">¡Ya puedes probar nuestro nuevo modo de supervivencia! Entra en un mapa compartido, crece con las habilidades del modo clásico y enfréntate a otros jugadores hasta que sólo quede uno.</p>
+    <div class="arena-notice-rewards panel">
+      <div class="arena-notice-reward"><b id="arena-notice-reward-first">+1 ticket amarillo</b><span id="arena-notice-reward-first-note">Completa tu primera partida online válida.</span></div>
+      <div class="arena-notice-reward"><b id="arena-notice-reward-share">+3 tickets amarillos</b><span id="arena-notice-reward-share-note">Comparte este nuevo modo; una vez por cuenta.</span><button id="arena-notice-share" class="btn small gold" type="button">Compartir y ganar 3</button></div>
+      <p id="arena-notice-share-status" class="note" role="status"></p>
+    </div>
+    <div class="panel arena-notice-panel">
+      <h3 id="arena-notice-how-title">¿Cómo se juega?</h3>
+      <ul class="arena-notice-list">
+        <li id="arena-notice-how-1">Usa WASD o el joystick para moverte y conserva las habilidades, controles y progresión del modo clásico.</li>
+        <li id="arena-notice-how-2">Los jugadores pueden dañarse entre sí. Sobrevive, sube de nivel y aprovecha el cierre del gas para ganar.</li>
+        <li id="arena-notice-how-3">La primera versión admite hasta 8 jugadores y sólo permite entrar con un personaje legendario que ya tengas.</li>
+      </ul>
+    </div>
+    <div class="panel arena-notice-panel arena-notice-warning">
+      <h3 id="arena-notice-warning-title">Importante durante la prueba</h3>
+      <p id="arena-notice-warning-copy">Estamos probando el equilibrio, el ritmo de las partidas y la estabilidad del modo. Puede haber errores, ajustes frecuentes, problemas de conexión o situaciones todavía no pulidas. ¡Gracias por tu paciencia! Si encuentras algo extraño, tus comentarios nos ayudarán a mejorarlo.</p>
+      <p><b id="arena-notice-cost-label">Coste de prueba:</b> <span id="arena-notice-cost-copy">100 monedas por partida. En esta fase no se usan tickets amarillos. Cuando el modo esté listo para su lanzamiento oficial, el coste se cambiará a tickets de intercambio.</span></p>
+    </div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end">
+      <button id="arena-notice-later" class="btn ghost" type="button">Ahora no</button>
+      <button id="arena-notice-go" class="btn gold" type="button">Probar el modo</button>
+    </div>
+  </div>
+</section>
+
+<!-- ====== Último Superviviente / Battle Royale (loop clásico + emparejamiento online opcional) ====== -->
+<section id="scr-arena" class="scr dim hidden">
+  <div class="box wide arena-box">
+    <div class="row between arena-head">
+      <div>
+        <h2><span id="arena-title">Último Superviviente</span> <span id="arena-title-subtitle" class="sub" style="font-size:15px">· Battle Royale · 皇家生存战</span></h2>
+        <p id="arena-description" class="sub">Modo de supervivencia para 8 jugadores. Usa el mapa, WASD/joystick y las habilidades del modo clásico; durante la prueba se usan monedas y no se descuentan tickets amarillos.</p>
+      </div>
+      <button class="btn small ghost" id="arena-menu">Salir al menú</button>
+    </div>
+    <div class="arena-rules panel">
+      <span><b>8</b> plazas</span><span><b>100</b> monedas para entrar</span><span>premio previsto: <b>700</b></span>
+      <span>地图：圆形直径 96 格</span><span>10:00 + 60 s de gas furioso</span>
+      <span>角色平衡 v3 · 103 角色 · 怪物经典刷新量 · HP 72% · 伤害 65%</span>
+      <span>仅普通怪物 · 无裂缝 / Boss / 随机事件</span>
+    </div>
+    <div class="arena-setup" id="arena-setup">
+      <div class="panel arena-role-panel">
+        <h3>Elige un legendario que ya tengas</h3>
+        <p class="note" style="margin:4px 0 8px">Sólo aparecen personajes propios de rareza legendaria. No hay límite de jugadores por personaje; el límite futuro será sólo de plazas de la sala.</p>
+        <select id="arena-role" class="field"></select>
+        <canvas id="arena-role-stage" class="stage" width="180" height="150"></canvas>
+        <div id="arena-role-detail" class="arena-role-detail"></div>
+        <div class="row" style="gap:8px">
+          <button id="arena-join" class="btn gold grow" type="button">Entrar en sala de prueba</button>
+          <button id="arena-online-queue" class="btn ghost grow" type="button" disabled>Buscar jugadores reales</button>
+        </div>
+      </div>
+      <div class="panel arena-room-panel">
+        <div class="row between"><h3>Sala de prueba</h3><b id="arena-count" class="gold">0/8</b></div>
+        <div id="arena-slots" class="arena-slots"></div>
+        <div class="row" style="margin-top:12px">
+          <button id="arena-start" class="btn gold grow" type="button" disabled>Entrar al combate</button>
+          <button id="arena-reset" class="btn small ghost" type="button">Reiniciar</button>
+        </div>
+        <p id="arena-note" class="note" role="status">Primero selecciona un personaje propio. La sala local usa IA de prueba; el botón de jugadores reales cobra 100 monedas en el servidor al entrar en la cola.</p>
+      </div>
+    </div>
+    <div id="arena-battle" class="arena-battle hidden">
+      <div class="row between">
+        <h3>Combate local</h3>
+        <div class="arena-clock"><span id="arena-phase">Preparación</span> · <b id="arena-timer">00:00</b></div>
+      </div>
+      <p class="note" id="arena-battle-note">Velocidad de vista previa ×24 · sala local · entrada 100 monedas · sin tickets amarillos.</p>
+      <canvas id="arena-canvas" class="arena-canvas" width="720" height="420"></canvas>
+      <div id="arena-scoreboard" class="arena-scoreboard"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="arena-exit" class="btn ghost" type="button">Abandonar y salir</button>
+        <button id="arena-menu-battle" class="btn small ghost" type="button">Salir al menú</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="scr-arena-death" class="scr dim hidden">
+  <div class="box center arena-death-box">
+    <h2 id="arena-death-title">Has sido eliminado</h2>
+    <p id="arena-death-note" class="note">La partida continúa para los supervivientes.</p>
+    <button id="arena-death-exit" class="btn gold grow" type="button">Salir de la sala</button>
+  </div>
+</section>
+
+<section id="scr-arena-feedback" class="scr dim hidden">
+  <div class="box arena-feedback-box">
+    <div class="row between">
+      <div>
+        <h2>Ayúdanos a mejorar Último Superviviente</h2>
+        <p class="sub" style="margin:4px 0 0">Has jugado 5 partidas. Responde sólo lo esencial; puedes cerrar esta ventana.</p>
+      </div>
+      <button id="arena-feedback-close" class="btn small ghost" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <form id="arena-feedback-form" class="arena-feedback-form">
+      <fieldset>
+        <legend>¿Te gusta este modo?</legend>
+        <label><input type="radio" name="liked" value="yes" required> Sí, me gusta</label>
+        <label><input type="radio" name="liked" value="mixed"> Más o menos</label>
+        <label><input type="radio" name="liked" value="no"> No</label>
+      </fieldset>
+      <fieldset>
+        <legend>¿Qué te gusta más? <span class="sub">(máximo 2)</span></legend>
+        <label><input type="checkbox" name="likedPoint" value="movement-skills"> Movimiento y habilidades</label>
+        <label><input type="checkbox" name="likedPoint" value="pvp-hunt"> Perseguir y enfrentarse a otros jugadores</label>
+        <label><input type="checkbox" name="likedPoint" value="gas-pressure"> El gas y la presión del tiempo</label>
+        <label><input type="checkbox" name="likedPoint" value="growth-strategy"> Subir de nivel y tomar decisiones</label>
+      </fieldset>
+      <label class="arena-feedback-wide" for="arena-feedback-disliked">¿Qué debería mejorar primero?</label>
+      <select id="arena-feedback-disliked" class="field" name="dislikedPoint">
+        <option value="">Prefiero no responder</option>
+        <option value="balance-damage">Daño y equilibrio de personajes</option>
+        <option value="monsters">Cantidad o fuerza de los monstruos</option>
+        <option value="map-spawns">Mapa o puntos de aparición</option>
+        <option value="skills-levels">Habilidades o subida de nivel</option>
+        <option value="pace-gas">Ritmo o gas</option>
+        <option value="connection">Conexión, caída o reconexión</option>
+        <option value="nothing">No cambiaría nada importante</option>
+      </select>
+      <label class="arena-feedback-wide" for="arena-feedback-suggestion">¿Alguna sugerencia breve? <span class="sub">(opcional)</span></label>
+      <textarea id="arena-feedback-suggestion" class="field" name="suggestion" maxlength="240" rows="3" placeholder="Escribe una idea concreta…"></textarea>
+      <p id="arena-feedback-error" class="error" role="alert"></p>
+      <div class="row" style="margin-top:10px;justify-content:flex-end">
+        <button id="arena-feedback-skip" class="btn ghost" type="button">Ahora no</button>
+        <button id="arena-feedback-submit" class="btn gold" type="submit">Enviar respuesta</button>
+      </div>
+    </form>
+  </div>
+</section>
+
 <!-- ====== Ranking ====== -->
 <section id="scr-rank" class="scr dim hidden">
   <div class="box wide">
@@ -595,6 +742,6 @@
 </section>
 
 <!-- datos generados -->
-<script defer src="js/app.min.js?v=9bcbdc92de"></script>
+<script defer src="js/app.min.js?v=992ac52879"></script>
 </body>
 </html>

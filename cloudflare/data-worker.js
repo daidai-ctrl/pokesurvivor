@@ -13,8 +13,14 @@ const ORIGINS = new Set([
 ]);
 const JWKS = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 const TOP = 50;
-const SHARE_CAMPAIGN = 'share_t1_5_v1';
-const SHARE_TICKETS = 5;
+// Campaign rewards are keyed by campaign so each campaign can be claimed once
+// per account without changing the history of older campaigns.
+const SHARE_CAMPAIGNS = Object.freeze({
+  share_t1_5_v1: 5,
+  arena_share_t1_3_v1: 3
+});
+const ARENA_FIRST_MATCH_CAMPAIGN = 'arena_first_match_t1_v1';
+const ARENA_FIRST_MATCH_TICKETS = 1;
 const WAFFO_MAX_BODY = 300000;
 let keys = null, keysAt = 0;
 
@@ -97,13 +103,29 @@ async function savePut(env, uid, value) {
 }
 
 async function savePutV2(env, uid, value, baseVersion) {
-  const row = await env.pokesurvivor_data.prepare('SELECT payload, game_updated FROM saves WHERE uid = ?').bind(uid).first();
+  let row;
+  try {
+    row = await env.pokesurvivor_data.prepare(
+      `SELECT payload, game_updated,
+              EXISTS(SELECT 1 FROM ticket_quarantines q WHERE q.uid = ?) AS tickets_quarantined
+         FROM saves WHERE uid = ?`
+    ).bind(uid, uid).first();
+  } catch (error) {
+    // Keep old preview/test databases usable while the additive flags table is
+    // being created. Production has the table, so this path is only a safe
+    // migration fallback and never disables the quarantine there.
+    if (!/account_flags|no such table/i.test(String(error && (error.message || error.errstr) || error))) throw error;
+    row = await env.pokesurvivor_data.prepare('SELECT payload, game_updated FROM saves WHERE uid = ?').bind(uid).first();
+  }
   if (row) {
     const current = parse(row.payload, null);
     if (!current || current.syncV !== 2 || baseVersion !== await saveVersion(row.payload, row.game_updated)) return null;
   } else if (baseVersion !== null) return null;
 
-  const payload = JSON.stringify(value);
+  const storedValue = row && row.tickets_quarantined
+    ? Object.assign({}, value, { tickets: Object.assign({}, value.tickets || {}, { t1: 0, t10: 0 }) })
+    : value;
+  const payload = JSON.stringify(storedValue);
   if (row && payload === row.payload) return await saveVersion(payload, row.game_updated);
   const now = Date.now();
   // Client clocks are not a concurrency primitive. Keep the legacy column
@@ -121,6 +143,17 @@ async function savePutV2(env, uid, value, baseVersion) {
 
 function boundedText(value, max = 200) {
   return String(value == null ? '' : value).slice(0, max);
+}
+
+function objectKeyCount(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).length : 0;
+}
+
+async function leaderboardHidden(env, uid) {
+  const row = await env.pokesurvivor_data.prepare(
+    "SELECT 1 AS hidden FROM account_flags WHERE uid = ? AND flag = 'leaderboard_hidden' LIMIT 1"
+  ).bind(uid).first();
+  return !!row;
 }
 
 function waffoMetadata(data) {
@@ -341,6 +374,20 @@ async function entriesForUsers(env, board, users) {
     .filter(row => (row.data.uids || []).some(x => users.includes(x)));
 }
 
+function rankingTrimStatements(env, board) {
+  const keep = `SELECT entry_id FROM ranking_entries WHERE board = ? ORDER BY t DESC, entry_id ASC LIMIT ${TOP}`;
+  return [
+    env.pokesurvivor_data.prepare(
+      `DELETE FROM ranking_entry_members
+       WHERE board = ? AND entry_id NOT IN (${keep})`
+    ).bind(board, board),
+    env.pokesurvivor_data.prepare(
+      `DELETE FROM ranking_entries
+       WHERE board = ? AND entry_id NOT IN (${keep})`
+    ).bind(board, board)
+  ];
+}
+
 async function validateRanking(env, uid, board, id, entry) {
   if (!entry || !id || !board) throw new Error('invalid ranking payload');
   const t = Number(entry.t), lv = Number(entry.lv), kills = Number(entry.kills);
@@ -381,15 +428,31 @@ async function storeRanking(env, uid, value) {
     if (!board) continue;
     const old = await env.pokesurvivor_data.prepare('SELECT t FROM ranking_entries WHERE board = ? AND entry_id = ?').bind(board, id).first();
     if (old && Number(old.t) >= Number(entry.t || 0)) continue;
-    if (['d', 'w', 'm', 'p'].includes(period)) {
-      const full = await env.pokesurvivor_data.prepare('SELECT COUNT(*) AS n, MIN(t) AS min_t FROM ranking_entries WHERE board = ?').bind(board).first();
-      if (Number(full && full.n) >= TOP && Number(entry.t || 0) <= Number(full.min_t || 0)) continue;
+    const topOnly = ['d', 'w', 'm', 'p'].includes(period);
+    if (topOnly) {
+      // The 50th best row is the cutoff. This stays bounded even if an older
+      // database still contains overflow rows from before the trim fix.
+      const cutoff = await env.pokesurvivor_data.prepare(
+        `SELECT t FROM ranking_entries WHERE board = ? ORDER BY t DESC, entry_id ASC LIMIT 1 OFFSET ${TOP - 1}`
+      ).bind(board).first();
+      if (cutoff && Number(entry.t || 0) <= Number(cutoff.t || 0)) continue;
     }
-    await env.pokesurvivor_data.prepare(
-      `INSERT INTO ranking_entries(board, entry_id, t, payload, updated_at) VALUES(?, ?, ?, ?, ?)
-       ON CONFLICT(board, entry_id) DO UPDATE SET t=excluded.t, payload=excluded.payload, updated_at=excluded.updated_at
-       WHERE excluded.t > ranking_entries.t`
-    ).bind(board, id, Number(entry.t || 0), JSON.stringify(entry), Date.now()).run();
+    const members = Array.isArray(entry.uids)
+      ? [...new Set(entry.uids.map(String))].slice(0, 4)
+      : [];
+    const statements = [
+      env.pokesurvivor_data.prepare(
+        `INSERT INTO ranking_entries(board, entry_id, t, payload, updated_at) VALUES(?, ?, ?, ?, ?)
+         ON CONFLICT(board, entry_id) DO UPDATE SET t=excluded.t, payload=excluded.payload, updated_at=excluded.updated_at
+         WHERE excluded.t > ranking_entries.t`
+      ).bind(board, id, Number(entry.t || 0), JSON.stringify(entry), Date.now()),
+      env.pokesurvivor_data.prepare('DELETE FROM ranking_entry_members WHERE board = ? AND entry_id = ?').bind(board, id),
+      ...members.map(member => env.pokesurvivor_data.prepare(
+        'INSERT OR IGNORE INTO ranking_entry_members(board, entry_id, uid) VALUES(?, ?, ?)'
+      ).bind(board, id, member))
+    ];
+    if (topOnly) statements.push(...rankingTrimStatements(env, board));
+    await env.pokesurvivor_data.batch(statements);
     if (period && period !== 'p' && !better.includes(period)) better.push(period);
   }
   return { better };
@@ -397,7 +460,8 @@ async function storeRanking(env, uid, value) {
 
 async function claimShareReward(env, uid, value) {
   const campaign = String(value && value.campaign || '');
-  if (campaign !== SHARE_CAMPAIGN) return { error: 'invalid_campaign', status: 400 };
+  const tickets = Number(SHARE_CAMPAIGNS[campaign] || 0);
+  if (!tickets) return { error: 'invalid_campaign', status: 400 };
   const now = Date.now();
   const existing = await env.pokesurvivor_data.prepare(
     'SELECT status, created_at FROM share_rewards WHERE uid = ? AND campaign = ?'
@@ -409,7 +473,7 @@ async function claimShareReward(env, uid, value) {
   const inserted = await env.pokesurvivor_data.prepare(
     `INSERT OR IGNORE INTO share_rewards(uid, campaign, tickets_t1, status, created_at)
      VALUES(?, ?, ?, 'processing', ?)`
-  ).bind(uid, campaign, SHARE_TICKETS, now).run();
+  ).bind(uid, campaign, tickets, now).run();
   if (!inserted.meta || !inserted.meta.changes) return { error: 'reward_busy', status: 409 };
 
   try {
@@ -419,7 +483,7 @@ async function claimShareReward(env, uid, value) {
       const save = parse(row.payload, null);
       if (!save || typeof save !== 'object') return { error: 'save_invalid', status: 409 };
       save.tickets = save.tickets || { t1: 0, t10: 0 };
-      save.tickets.t1 = Math.max(0, Number(save.tickets.t1) || 0) + SHARE_TICKETS;
+      save.tickets.t1 = Math.max(0, Number(save.tickets.t1) || 0) + tickets;
       const gameUpdated = Math.max(Number(row.game_updated || 0) + 1, Date.now());
       save.updated = Math.max(Number(save.updated) || 0, gameUpdated);
       const result = await env.pokesurvivor_data.prepare(
@@ -431,7 +495,7 @@ async function claimShareReward(env, uid, value) {
           `UPDATE share_rewards SET status = 'claimed', claimed_at = ?
            WHERE uid = ? AND campaign = ? AND status = 'processing'`
         ).bind(Date.now(), uid, campaign).run();
-        return { ok: true, alreadyClaimed: false, tickets: SHARE_TICKETS, save };
+        return { ok: true, alreadyClaimed: false, tickets, save };
       }
     }
     return { error: 'save_busy', status: 409 };
@@ -448,27 +512,531 @@ async function claimShareReward(env, uid, value) {
 
 async function shareRewardStatus(env, uid, value) {
   const campaign = String(value && value.campaign || '');
-  if (campaign !== SHARE_CAMPAIGN) return { error: 'invalid_campaign', status: 400 };
+  if (!Number(SHARE_CAMPAIGNS[campaign] || 0)) return { error: 'invalid_campaign', status: 400 };
   const row = await env.pokesurvivor_data.prepare(
     'SELECT status FROM share_rewards WHERE uid = ? AND campaign = ?'
   ).bind(uid, campaign).first();
   return { ok: true, claimed: !!row && row.status === 'claimed' };
 }
 
+// Grants the first-match ticket only from a server-observed online outcome.
+// Local bot previews never call this path, and the campaign key makes retries
+// and reconnects harmless for the account economy.
+async function grantArenaFirstMatchReward(env, uid, matchId, eventType, value = {}) {
+  if (!['dead', 'win'].includes(eventType)) return null;
+  const now = Date.now();
+  const existing = await env.pokesurvivor_data.prepare(
+    'SELECT status, created_at FROM arena_reward_claims WHERE uid = ? AND campaign = ?'
+  ).bind(uid, ARENA_FIRST_MATCH_CAMPAIGN).first();
+  if (existing && existing.status === 'claimed') return { granted: false, alreadyClaimed: true, tickets: 0 };
+  if (existing && Number(existing.created_at || 0) > now - 10 * 60 * 1000) return { granted: false, busy: true, tickets: 0 };
+  if (existing) await env.pokesurvivor_data.prepare(
+    'DELETE FROM arena_reward_claims WHERE uid = ? AND campaign = ?'
+  ).bind(uid, ARENA_FIRST_MATCH_CAMPAIGN).run();
+
+  const inserted = await env.pokesurvivor_data.prepare(
+    `INSERT OR IGNORE INTO arena_reward_claims
+       (uid, campaign, match_id, tickets_t1, status, created_at)
+     VALUES (?, ?, ?, ?, 'processing', ?)`
+  ).bind(uid, ARENA_FIRST_MATCH_CAMPAIGN, matchId, ARENA_FIRST_MATCH_TICKETS, now).run();
+  if (!inserted.meta || !inserted.meta.changes) return { granted: false, busy: true, tickets: 0 };
+
+  let claimed = false;
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const row = await env.pokesurvivor_data.prepare(
+        'SELECT payload, game_updated FROM saves WHERE uid = ?'
+      ).bind(uid).first();
+      if (!row) return { granted: false, error: 'sync_required', tickets: 0 };
+      const save = parse(row.payload, null);
+      if (!save || typeof save !== 'object') return { granted: false, error: 'save_invalid', tickets: 0 };
+      save.tickets = Object.assign({ t1: 0, t10: 0 }, save.tickets || {});
+      save.tickets.t1 = Math.max(0, Number(save.tickets.t1) || 0) + ARENA_FIRST_MATCH_TICKETS;
+      const gameUpdated = Math.max(Number(row.game_updated || 0) + 1, Date.now());
+      save.updated = Math.max(Number(save.updated) || 0, gameUpdated);
+      const result = await env.pokesurvivor_data.prepare(
+        `UPDATE saves SET payload = ?, game_updated = ?, updated_at = ?
+         WHERE uid = ? AND game_updated = ?`
+      ).bind(JSON.stringify(save), gameUpdated, Date.now(), uid, Number(row.game_updated || 0)).run();
+      if (!(result.meta && result.meta.changes)) continue;
+
+      await env.pokesurvivor_data.prepare(
+        `UPDATE arena_reward_claims SET status = 'claimed', claimed_at = ?, payload = ?
+         WHERE uid = ? AND campaign = ? AND status = 'processing'`
+      ).bind(Date.now(), JSON.stringify({ eventType, level: Number(value.level) || 1 }), uid,
+        ARENA_FIRST_MATCH_CAMPAIGN).run();
+      claimed = true;
+      return { granted: true, alreadyClaimed: false, tickets: ARENA_FIRST_MATCH_TICKETS, save };
+    }
+    return { granted: false, error: 'save_busy', tickets: 0 };
+  } finally {
+    if (!claimed) await env.pokesurvivor_data.prepare(
+      `DELETE FROM arena_reward_claims WHERE uid = ? AND campaign = ? AND status = 'processing'`
+    ).bind(uid, ARENA_FIRST_MATCH_CAMPAIGN).run();
+  }
+}
+
 async function collections(env, uids) {
   if (uids.length) {
     const q = uids.map(() => '?').join(',');
     const rows = await env.pokesurvivor_data.prepare(
-      `SELECT uid, name, score, owned_count AS ownedCount, shiny_count AS shinyCount FROM collections
-       WHERE uid IN (${q}) ORDER BY score DESC, owned_count DESC, shiny_count DESC, name COLLATE NOCASE LIMIT ${TOP}`
+      `SELECT c.uid, c.name, c.score, c.owned_count AS ownedCount, c.shiny_count AS shinyCount FROM collections c
+       LEFT JOIN account_flags f ON f.uid = c.uid AND f.flag = 'leaderboard_hidden'
+       WHERE c.uid IN (${q}) AND f.uid IS NULL
+       ORDER BY c.score DESC, c.owned_count DESC, c.shiny_count DESC, c.name COLLATE NOCASE LIMIT ${TOP}`
     ).bind(...uids).all();
     return rows.results || [];
   }
   const rows = await env.pokesurvivor_data.prepare(
-    `SELECT uid, name, score, owned_count AS ownedCount, shiny_count AS shinyCount FROM collections
-     ORDER BY score DESC, owned_count DESC, shiny_count DESC, name COLLATE NOCASE LIMIT ${TOP}`
+    `SELECT c.uid, c.name, c.score, c.owned_count AS ownedCount, c.shiny_count AS shinyCount FROM collections c
+     LEFT JOIN account_flags f ON f.uid = c.uid AND f.flag = 'leaderboard_hidden'
+     WHERE f.uid IS NULL
+     ORDER BY c.score DESC, c.owned_count DESC, c.shiny_count DESC, c.name COLLATE NOCASE LIMIT ${TOP}`
   ).all();
   return rows.results || [];
+}
+
+// ---------------- online Arena ----------------
+
+const ARENA_ONLINE = Object.freeze({
+  version: 'arena-mvp-online-v2',
+  balanceVersion: 'sim-100k-v3',
+  mapVersion: 'normal-48-v1',
+  entryCoins: 100,
+  prizeCoins: 700,
+  maxPlayers: 8,
+  reconnectMs: 45_000,
+  maxDurationSec: 720,
+  telemetryMs: 5_000
+});
+const ARENA_RULES = Object.freeze({
+  modeName: 'royal-survival',
+  maxPlayers: 8,
+  entryCoins: 100,
+  winnerPayout: 700,
+  ownedLegendaryOnly: true,
+  duplicateRoles: 'allowed',
+  mapRadiusTiles: 48,
+  gasStartSec: 600,
+  frenzyStartSec: 660,
+  reconnectMs: 45_000,
+  ordinaryMonstersOnly: true,
+  rifts: false,
+  bosses: false,
+  timedEvents: false,
+  balanceVersion: 'sim-100k-v3'
+});
+// This is the server-side allowlist for the current 103-role MVP. It keeps a
+// modified browser from entering with a non-legendary role or a role that is
+// not part of the tested balance table.
+const ARENA_LEGENDARY_DEX = new Set([
+  144,145,146,149,150,151,243,244,245,248,249,250,251,289,373,376,377,378,
+  379,380,381,382,383,384,385,386,445,480,481,482,483,484,485,486,487,488,
+  489,490,491,492,493,494,635,638,639,640,641,642,643,644,645,646,647,648,
+  649,706,716,717,718,719,720,721,772,773,784,785,786,787,788,789,790,791,
+  792,800,801,802,807,808,809,887,888,889,890,891,892,894,895,896,897,898,
+  905,998,1004,1005,1006,1007,1009,1010,1015,1016,1017,1018,1024
+]);
+
+function arenaId(prefix) {
+  return `${prefix}_${crypto.randomUUID().replace(/-/g, '')}`;
+}
+
+function arenaInput(value) {
+  const v = value && typeof value === 'object' ? value : {};
+  const dex = Number(v.dex);
+  const name = boundedText(v.name, 40).trim();
+  const requestId = /^[A-Za-z0-9_-]{8,80}$/.test(String(v.requestId || ''))
+    ? String(v.requestId) : crypto.randomUUID();
+  return {
+    dex: Number.isInteger(dex) && dex > 0 && dex < 2000 ? dex : 0,
+    name: name || 'Jugador',
+    shiny: !!v.shiny,
+    requestId
+  };
+}
+
+function arenaRulesJson() { return JSON.stringify(ARENA_RULES); }
+
+async function arenaRecordIncident(env, matchId, uid, kind, severity, payload = {}) {
+  const safeKind = boundedText(kind, 60) || 'unknown';
+  const safeSeverity = ['info', 'warn', 'high'].includes(severity) ? severity : 'warn';
+  const seq = Number(payload.seq) || Math.floor(Date.now() / 1000);
+  const dedupeKey = `${matchId}:${uid}:${safeKind}:${seq}`;
+  const result = await env.pokesurvivor_data.prepare(
+    `INSERT OR IGNORE INTO arena_match_incidents
+       (incident_id, match_id, uid, kind, severity, elapsed_sec, dedupe_key, payload, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(arenaId('inc'), matchId, uid, safeKind, safeSeverity,
+    Math.max(0, Math.min(ARENA_ONLINE.maxDurationSec, Math.floor(Number(payload.elapsedSec) || 0))),
+    dedupeKey, JSON.stringify(payload).slice(0, 4000), Date.now()).run();
+  if (result.meta && result.meta.changes) {
+    await env.pokesurvivor_data.batch([
+      env.pokesurvivor_data.prepare(
+        `UPDATE arena_match_players SET anomaly_count = anomaly_count + 1
+           WHERE match_id = ? AND uid = ?`
+      ).bind(matchId, uid),
+      env.pokesurvivor_data.prepare(
+        `UPDATE arena_matches SET anomaly_count = anomaly_count + 1 WHERE match_id = ?`
+      ).bind(matchId)
+    ]);
+  }
+  return !!(result.meta && result.meta.changes);
+}
+
+async function arenaRecordTelemetry(env, matchId, uid, state, elapsedSec, sampleSeq, flags = {}) {
+  const now = Date.now();
+  const result = await env.pokesurvivor_data.prepare(
+    `INSERT OR IGNORE INTO arena_match_telemetry
+       (telemetry_id, match_id, uid, sample_seq, elapsed_sec, x, y, hp, max_hp,
+        damage_taken, level, kills, damage, pve_kills, skill_casts, flags_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(arenaId('tel'), matchId, uid, sampleSeq,
+    Math.max(0, Math.min(ARENA_ONLINE.maxDurationSec, Math.floor(Number(elapsedSec) || 0))),
+    Number(state.x) || 0, Number(state.y) || 0, Number(state.hp) || 0,
+    Number(state.maxHp) || 1, Number(state.damageTaken) || 0, Number(state.level) || 1,
+    Number(state.kills) || 0, Number(state.damage) || 0, Number(state.pveKills) || 0,
+    Number(state.skillCasts) || 0, JSON.stringify(flags).slice(0, 1000), now).run();
+  if (result.meta && result.meta.changes) {
+    await env.pokesurvivor_data.batch([
+      env.pokesurvivor_data.prepare(
+        `UPDATE arena_match_players SET state_seq = ?, last_state_at = ?, last_x = ?, last_y = ?,
+           hp = ?, max_hp = ?, damage_taken = MAX(damage_taken, ?), level = ?,
+           state_updates = state_updates + 1, kills = MAX(kills, ?), damage = MAX(damage, ?),
+           pve_kills = MAX(pve_kills, ?), skill_casts = MAX(skill_casts, ?)
+         WHERE match_id = ? AND uid = ?`
+      ).bind(Number(state.seq) || 0, now, Number(state.x) || 0, Number(state.y) || 0,
+        Number(state.hp) || 0, Number(state.maxHp) || 1, Number(state.damageTaken) || 0,
+        Number(state.level) || 1, Number(state.kills) || 0, Number(state.damage) || 0,
+        Number(state.pveKills) || 0, Number(state.skillCasts) || 0, matchId, uid),
+      env.pokesurvivor_data.prepare(
+        `UPDATE arena_matches SET server_state_updates = server_state_updates + 1,
+           peak_active_players = MAX(peak_active_players,
+             (SELECT COUNT(*) FROM arena_match_players WHERE match_id = ? AND status IN ('connected','playing')))
+         WHERE match_id = ?`
+      ).bind(matchId, matchId)
+    ]);
+  }
+  return !!(result.meta && result.meta.changes);
+}
+
+async function arenaSnapshot(env, matchId, uid) {
+  const match = await env.pokesurvivor_data.prepare(
+    `SELECT match_id AS matchId, room_id AS roomId, status, mode_version AS modeVersion,
+            balance_version AS balanceVersion, map_version AS mapVersion,
+            rules_json AS rulesJson, entry_coins AS entryCoins,
+            prize_coins AS prizeCoins, expected_players AS expectedPlayers, seed,
+            created_at AS createdAt, started_at AS startedAt, ended_at AS endedAt,
+            ended_reason AS endedReason, duration_sec AS durationSec,
+            peak_active_players AS peakActivePlayers, server_state_updates AS serverStateUpdates,
+            server_actions AS serverActions, anomaly_count AS anomalyCount,
+            winner_uid AS winnerUid, settlement_hash AS settlementHash
+       FROM arena_matches WHERE match_id = ?`
+  ).bind(matchId).first();
+  if (!match) return null;
+  const rows = await env.pokesurvivor_data.prepare(
+    `SELECT uid, seat, name, dex, shiny, status, joined_at AS joinedAt,
+            last_seen_at AS lastSeenAt, reconnect_until AS reconnectUntil,
+            death_at AS deathAt, kills, damage, damage_taken AS damageTaken,
+            pve_kills AS pveKills, skill_casts AS skillCasts, level, hp, max_hp AS maxHp,
+            state_seq AS stateSeq, state_updates AS stateUpdates,
+            action_count AS actionCount, anomaly_count AS anomalyCount,
+            disconnects, reconnects, outcome_rank AS outcomeRank,
+            outcome_reason AS outcomeReason
+       FROM arena_match_players WHERE match_id = ? ORDER BY seat ASC`
+  ).bind(matchId).all();
+  const player = (rows.results || []).find(row => row.uid === uid) || null;
+  return { match, players: rows.results || [], player };
+}
+
+async function arenaCurrent(env, uid) {
+  const queued = await env.pokesurvivor_data.prepare(
+    `SELECT uid, request_id AS requestId, name, dex, shiny, status,
+            match_id AS matchId, queued_at AS queuedAt
+       FROM arena_queue WHERE uid = ?`
+  ).bind(uid).first();
+  if (queued && queued.status === 'queued') {
+    const ahead = await env.pokesurvivor_data.prepare(
+      `SELECT COUNT(*) AS n FROM arena_queue WHERE status = 'queued' AND queued_at < ?`
+    ).bind(queued.queuedAt).first();
+    return { status: 'queued', queue: queued, position: Number(ahead && ahead.n || 0) + 1 };
+  }
+  const player = await env.pokesurvivor_data.prepare(
+    `SELECT p.match_id AS matchId, m.status FROM arena_match_players p
+       JOIN arena_matches m ON m.match_id = p.match_id
+      WHERE p.uid = ? AND m.status IN ('running', 'settling', 'settled')
+      ORDER BY m.created_at DESC LIMIT 1`
+  ).bind(uid).first();
+  if (!player) return { status: 'idle' };
+  const snapshot = await arenaSnapshot(env, player.matchId, uid);
+  return { status: player.status, ...snapshot };
+}
+
+async function arenaAllocate(env) {
+  const queued = await env.pokesurvivor_data.prepare(
+    `SELECT uid, request_id AS requestId, name, dex, shiny, queued_at AS queuedAt
+       FROM arena_queue WHERE status = 'queued' ORDER BY queued_at ASC LIMIT ?`
+  ).bind(ARENA_ONLINE.maxPlayers).all();
+  const rows = queued.results || [];
+  if (rows.length < ARENA_ONLINE.maxPlayers) return null;
+  const now = Date.now();
+  const matchId = arenaId('am');
+  const roomId = arenaId('ar');
+  const seed = Math.floor(Math.random() * 0x7fffffff);
+  const statements = [env.pokesurvivor_data.prepare(
+    `INSERT INTO arena_matches
+     (match_id, room_id, status, mode_version, balance_version, map_version, rules_json,
+      entry_coins, prize_coins, expected_players, seed, created_at, started_at)
+     VALUES (?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(matchId, roomId, ARENA_ONLINE.version, ARENA_ONLINE.balanceVersion,
+    ARENA_ONLINE.mapVersion, arenaRulesJson(), ARENA_ONLINE.entryCoins,
+    ARENA_ONLINE.prizeCoins, ARENA_ONLINE.maxPlayers, seed, now, now)];
+  rows.forEach((row, seat) => {
+    statements.push(env.pokesurvivor_data.prepare(
+      `INSERT INTO arena_match_players
+       (match_id, uid, seat, name, dex, shiny, entry_coins, status, joined_at, last_seen_at, reconnect_until)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?)`
+    ).bind(matchId, row.uid, seat, row.name, row.dex, row.shiny ? 1 : 0,
+      ARENA_ONLINE.entryCoins, now, now, now + ARENA_ONLINE.reconnectMs));
+    statements.push(env.pokesurvivor_data.prepare(
+      `UPDATE arena_queue SET status = 'matched', match_id = ?, updated_at = ?
+        WHERE uid = ? AND status = 'queued'`
+    ).bind(matchId, now, row.uid));
+    statements.push(env.pokesurvivor_data.prepare(
+      `UPDATE arena_wallet_ledger SET match_id = ?
+        WHERE uid = ? AND kind = 'arena_entry' AND idempotency_key = ? AND match_id IS NULL`
+    ).bind(matchId, row.uid, `arena-entry:${row.uid}:${row.requestId}`));
+  });
+  await env.pokesurvivor_data.batch(statements);
+  return { matchId, roomId };
+}
+
+async function arenaChargeAndQueue(env, uid, value) {
+  const current = await arenaCurrent(env, uid);
+  // A settled match is history, not a lock: the same account may enter a new
+  // match after the previous prize has been recorded.
+  if (current.status === 'queued' || (current.match && current.match.status !== 'settled')) return current;
+  const input = arenaInput(value);
+  if (!ARENA_LEGENDARY_DEX.has(input.dex)) return { error: 'invalid_role', status: 400 };
+  const row = await env.pokesurvivor_data.prepare(
+    'SELECT payload, game_updated FROM saves WHERE uid = ?'
+  ).bind(uid).first();
+  const save = row ? parse(row.payload, null) : null;
+  if (!save || save.syncV !== 2) return { error: 'save_required', status: 409 };
+  if (!save.owned || !save.owned[input.dex]) return { error: 'role_not_owned', status: 403 };
+  if (input.shiny && (!save.shiny || !save.shiny[input.dex])) return { error: 'shiny_not_owned', status: 403 };
+  // The display name is identity data, not client input.
+  input.name = boundedText(save.name, 40).trim() || input.name;
+  const coins = Math.floor(Number(save.coins) || 0);
+  if (coins < ARENA_ONLINE.entryCoins) return { error: 'coins_insufficient', status: 409 };
+  const now = Date.now();
+  const gameUpdated = Math.max(now, Number(row.game_updated || 0) + 1);
+  const payloadUpdated = Math.max(now, Number(save.updated || 0) + 1);
+  const nonce = crypto.randomUUID();
+  const ledgerKey = `arena-entry:${uid}:${input.requestId}`;
+  try {
+    await env.pokesurvivor_data.batch([
+      env.pokesurvivor_data.prepare(
+        `UPDATE saves SET payload = json_set(payload, '$.coins',
+           CAST(json_extract(payload, '$.coins') AS INTEGER) - ?, '$.updated', ?),
+           game_updated = ?, updated_at = ?
+         WHERE uid = ? AND game_updated = ? AND payload = ?
+           AND CAST(json_extract(payload, '$.coins') AS INTEGER) >= ?`
+      ).bind(ARENA_ONLINE.entryCoins, payloadUpdated, gameUpdated, now, uid,
+        Number(row.game_updated || 0), row.payload, ARENA_ONLINE.entryCoins),
+      env.pokesurvivor_data.prepare(
+        `INSERT INTO arena_wallet_guards(id, ok) VALUES (?, CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`
+      ).bind(nonce),
+      env.pokesurvivor_data.prepare(
+        `INSERT INTO arena_wallet_ledger
+         (ledger_id, uid, match_id, kind, amount, idempotency_key, created_at, payload)
+         VALUES (?, ?, NULL, 'arena_entry', ?, ?, ?, ?)`
+      ).bind(nonce, uid, -ARENA_ONLINE.entryCoins, ledgerKey, now,
+        JSON.stringify({ version: ARENA_ONLINE.version, requestId: input.requestId, dex: input.dex })),
+      // arena_queue is keyed by uid. Once a previous match is settled, its
+      // matched queue row is historical and must not block the next entry.
+      env.pokesurvivor_data.prepare(
+        `DELETE FROM arena_queue WHERE uid = ? AND status = 'matched'`
+      ).bind(uid),
+      env.pokesurvivor_data.prepare(
+        `INSERT INTO arena_queue(uid, request_id, name, dex, shiny, status, queued_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)`
+      ).bind(uid, input.requestId, input.name, input.dex, input.shiny ? 1 : 0, now, now),
+      env.pokesurvivor_data.prepare('DELETE FROM arena_wallet_guards WHERE id = ?').bind(nonce)
+    ]);
+  } catch (error) {
+    // A duplicate request is safe: the existing queue/match is returned on
+    // the next call. Any failed CAS rolls back both the charge and ledger.
+    const retry = await arenaCurrent(env, uid);
+    if (retry.status !== 'idle') return retry;
+    throw error;
+  }
+  await arenaAllocate(env);
+  return arenaCurrent(env, uid);
+}
+
+async function arenaRefundQueued(env, uid) {
+  const queued = await env.pokesurvivor_data.prepare(
+    `SELECT request_id AS requestId FROM arena_queue WHERE uid = ? AND status = 'queued'`
+  ).bind(uid).first();
+  if (!queued) return arenaCurrent(env, uid);
+  const row = await env.pokesurvivor_data.prepare(
+    'SELECT payload, game_updated FROM saves WHERE uid = ?'
+  ).bind(uid).first();
+  if (!row) return { error: 'save_required', status: 409 };
+  const now = Date.now(), nonce = crypto.randomUUID();
+  const gameUpdated = Math.max(now, Number(row.game_updated || 0) + 1);
+  const key = `arena-refund:${uid}:${queued.requestId}`;
+  await env.pokesurvivor_data.batch([
+    env.pokesurvivor_data.prepare(
+      `UPDATE saves SET payload = json_set(payload, '$.coins',
+         CAST(json_extract(payload, '$.coins') AS INTEGER) + ?, '$.updated', ?),
+         game_updated = ?, updated_at = ?
+       WHERE uid = ? AND game_updated = ? AND payload = ?`
+    ).bind(ARENA_ONLINE.entryCoins, now, gameUpdated, now, uid, Number(row.game_updated || 0), row.payload),
+    env.pokesurvivor_data.prepare(
+      `INSERT INTO arena_wallet_guards(id, ok) VALUES (?, CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`
+    ).bind(nonce),
+    env.pokesurvivor_data.prepare(
+      `INSERT INTO arena_wallet_ledger
+       (ledger_id, uid, match_id, kind, amount, idempotency_key, created_at, payload)
+       VALUES (?, ?, NULL, 'arena_refund', ?, ?, ?, ?)`
+    ).bind(nonce, uid, ARENA_ONLINE.entryCoins, key, now, JSON.stringify({ version: ARENA_ONLINE.version })),
+    env.pokesurvivor_data.prepare('DELETE FROM arena_queue WHERE uid = ? AND status = \'queued\'').bind(uid),
+    env.pokesurvivor_data.prepare('DELETE FROM arena_wallet_guards WHERE id = ?').bind(nonce)
+  ]);
+  return { status: 'idle', refunded: ARENA_ONLINE.entryCoins };
+}
+
+async function arenaTrySettle(env, matchId, reason = 'elimination') {
+  const active = await env.pokesurvivor_data.prepare(
+    `SELECT uid, status, kills, damage FROM arena_match_players
+      WHERE match_id = ? AND status IN ('connected', 'playing') ORDER BY seat ASC`
+  ).bind(matchId).all();
+  const activeRows = active.results || [];
+  if (activeRows.length !== 1) return { settled: false, pending: true, active: activeRows.length };
+  const winner = activeRows[0];
+  const match = await env.pokesurvivor_data.prepare(
+    `SELECT prize_coins AS prizeCoins, status, started_at AS startedAt
+       FROM arena_matches WHERE match_id = ?`
+  ).bind(matchId).first();
+  if (!match) return { error: 'match_not_found', status: 404 };
+  if (match.status === 'settled') return { settled: true, winnerUid: winner.uid };
+  const all = await env.pokesurvivor_data.prepare(
+    `SELECT uid, seat, status, death_at AS deathAt, kills, damage
+       FROM arena_match_players WHERE match_id = ? ORDER BY seat ASC`
+  ).bind(matchId).all();
+  const allRows = all.results || [];
+  const rankRows = allRows.slice().sort((a, b) => {
+    if (a.uid === winner.uid) return -1;
+    if (b.uid === winner.uid) return 1;
+    const statusRank = value => value === 'dead' ? 0 : value === 'withdrawn' ? -1 : -2;
+    return statusRank(b.status) - statusRank(a.status)
+      || (Number(b.deathAt) || 0) - (Number(a.deathAt) || 0)
+      || (Number(b.kills) || 0) - (Number(a.kills) || 0)
+      || (Number(b.damage) || 0) - (Number(a.damage) || 0)
+      || Number(a.seat) - Number(b.seat);
+  });
+  const now = Date.now();
+  const durationSec = Math.max(0, Math.floor((now - Number(match.startedAt || now)) / 1000));
+  const saveRow = await env.pokesurvivor_data.prepare(
+    'SELECT payload, game_updated FROM saves WHERE uid = ?'
+  ).bind(winner.uid).first();
+  const save = saveRow ? parse(saveRow.payload, null) : null;
+  if (!save || save.syncV !== 2) return { settled: false, pending: true, error: 'winner_save_unavailable' };
+  const nonce = crypto.randomUUID();
+  const gameUpdated = Math.max(now, Number(saveRow.game_updated || 0) + 1);
+  const payloadUpdated = Math.max(now, Number(save.updated || 0) + 1);
+  const hashSource = `${matchId}:${winner.uid}:${reason}:${rankRows.map(row => `${row.uid}:${row.status}:${row.kills}:${row.damage}`).join('|')}`;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashSource));
+  const settlementHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  const statements = [
+    env.pokesurvivor_data.prepare(
+      `UPDATE saves SET payload = json_set(payload, '$.coins',
+         CAST(json_extract(payload, '$.coins') AS INTEGER) + ?, '$.updated', ?),
+         game_updated = ?, updated_at = ?
+       WHERE uid = ? AND game_updated = ? AND payload = ?`
+    ).bind(Number(match.prizeCoins) || ARENA_ONLINE.prizeCoins, payloadUpdated, gameUpdated, now,
+      winner.uid, Number(saveRow.game_updated || 0), saveRow.payload),
+    env.pokesurvivor_data.prepare(
+      `INSERT INTO arena_wallet_guards(id, ok) VALUES (?, CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`
+    ).bind(nonce),
+    env.pokesurvivor_data.prepare(
+      `INSERT INTO arena_wallet_ledger
+       (ledger_id, uid, match_id, kind, amount, idempotency_key, created_at, payload)
+       VALUES (?, ?, ?, 'arena_prize', ?, ?, ?, ?)`
+    ).bind(nonce, winner.uid, matchId, Number(match.prizeCoins) || ARENA_ONLINE.prizeCoins,
+      `arena-prize:${matchId}`, now, JSON.stringify({ version: ARENA_ONLINE.version, settlementHash })),
+    env.pokesurvivor_data.prepare(
+      `UPDATE arena_matches SET status = 'settled', ended_at = ?, ended_reason = ?,
+         duration_sec = ?, winner_uid = ?, settlement_hash = ?
+       WHERE match_id = ? AND status != 'settled'`
+    ).bind(now, boundedText(reason, 40) || 'elimination', durationSec, winner.uid, settlementHash, matchId)
+  ];
+  rankRows.forEach((row, index) => {
+    statements.push(env.pokesurvivor_data.prepare(
+      `UPDATE arena_match_players SET status = CASE WHEN uid = ? THEN 'won' ELSE status END,
+          outcome_rank = ?, outcome_reason = ?
+        WHERE match_id = ? AND uid = ?`
+    ).bind(winner.uid, index + 1, row.uid === winner.uid ? 'winner' : (row.status || 'eliminated'), matchId, row.uid));
+  });
+  statements.push(env.pokesurvivor_data.prepare('DELETE FROM arena_wallet_guards WHERE id = ?').bind(nonce));
+  try {
+    await env.pokesurvivor_data.batch(statements);
+  } catch (error) {
+    const settled = await env.pokesurvivor_data.prepare(
+      'SELECT status, winner_uid AS winnerUid, settlement_hash AS settlementHash FROM arena_matches WHERE match_id = ?'
+    ).bind(matchId).first();
+    if (settled && settled.status === 'settled') return { settled: true, ...settled };
+    throw error;
+  }
+  return { settled: true, winnerUid: winner.uid, settlementHash, reason };
+}
+
+async function arenaReport(env, uid, value) {
+  const v = value && typeof value === 'object' ? value : {};
+  const matchId = String(v.matchId || '');
+  const eventId = /^[A-Za-z0-9_-]{8,80}$/.test(String(v.eventId || '')) ? String(v.eventId) : crypto.randomUUID();
+  const eventType = ['state', 'dead', 'win', 'withdrawn'].includes(String(v.eventType)) ? String(v.eventType) : '';
+  const elapsedSec = Math.max(0, Math.min(ARENA_ONLINE.maxDurationSec, Math.floor(Number(v.elapsedSec) || 0)));
+  const level = Math.max(1, Math.min(200, Math.floor(Number(v.level) || 1)));
+  const kills = Math.max(0, Math.min(7, Math.floor(Number(v.kills) || 0)));
+  const damage = Math.max(0, Math.min(1e8, Number(v.damage) || 0));
+  const damageTaken = Math.max(0, Math.min(1e8, Number(v.damageTaken) || 0));
+  const pveKills = Math.max(0, Math.min(100000, Math.floor(Number(v.pveKills) || 0)));
+  const skillCasts = Math.max(0, Math.min(100000, Math.floor(Number(v.skillCasts) || 0)));
+  if (!/^am_[A-Za-z0-9]{20,64}$/.test(matchId) || !eventType) return { error: 'invalid_arena_report', status: 400 };
+  const player = await env.pokesurvivor_data.prepare(
+    `SELECT p.status AS playerStatus, m.status AS matchStatus FROM arena_match_players p
+       JOIN arena_matches m ON m.match_id = p.match_id
+      WHERE p.match_id = ? AND p.uid = ?`
+  ).bind(matchId, uid).first();
+  if (!player) return { error: 'arena_player_not_found', status: 404 };
+  if (player.matchStatus === 'settled') return arenaSnapshot(env, matchId, uid);
+  if (eventType === 'win' && ['dead', 'withdrawn'].includes(player.playerStatus)) return { error: 'player_eliminated', status: 409 };
+  const now = Date.now();
+  await env.pokesurvivor_data.batch([
+    env.pokesurvivor_data.prepare(
+      `INSERT OR IGNORE INTO arena_match_events
+       (event_id, match_id, uid, event_type, elapsed_sec, level, kills, damage, payload, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(eventId, matchId, uid, eventType, elapsedSec, level, kills, damage, JSON.stringify(v).slice(0, 4000), now),
+    env.pokesurvivor_data.prepare(
+      `UPDATE arena_match_players SET
+         status = CASE WHEN ? = 'dead' THEN 'dead' WHEN ? = 'withdrawn' THEN 'withdrawn'
+                       WHEN status = 'reserved' THEN 'playing' ELSE status END,
+         last_seen_at = ?, death_at = CASE WHEN ? IN ('dead','withdrawn') THEN ? ELSE death_at END,
+         kills = MAX(kills, ?), damage = MAX(damage, ?),
+         damage_taken = MAX(damage_taken, ?), pve_kills = MAX(pve_kills, ?),
+         skill_casts = MAX(skill_casts, ?)
+       WHERE match_id = ? AND uid = ?`
+    ).bind(eventType, eventType, now, eventType, now, kills, damage,
+      damageTaken, pveKills, skillCasts, matchId, uid)
+  ]);
+  const reward = await grantArenaFirstMatchReward(env, uid, matchId, eventType, { level });
+  const settlement = eventType === 'dead' || eventType === 'withdrawn' || eventType === 'win'
+    ? await arenaTrySettle(env, matchId, eventType === 'win' ? 'win' : eventType) : { settled: false };
+  return { ok: true, matchId, eventId, reward, settlement, ...(await arenaSnapshot(env, matchId, uid)) };
 }
 
 async function handle(req, env, uid, url) {
@@ -485,6 +1053,20 @@ async function handle(req, env, uid, url) {
         error.code === 'waffo_api_error' ? 502 : 500;
       return json({ error: error.code || 'checkout_unavailable' }, status);
     }
+  }
+
+  if (path === 'arena/match' && method === 'GET') {
+    const matchId = String(url.searchParams.get('matchId') || '');
+    if (!/^am_[A-Za-z0-9]{20,64}$/.test(matchId)) return json({ error: 'invalid_match' }, 400);
+    const snapshot = await arenaSnapshot(env, matchId, uid);
+    if (!snapshot) return json({ error: 'arena_match_not_found' }, 404);
+    if (!snapshot.player) return json({ error: 'arena_player_not_found' }, 403);
+    return json(snapshot);
+  }
+
+  if (path === 'arena/report' && method === 'POST') {
+    const result = await arenaReport(env, uid, await readBody(req) || {});
+    return json(result, result.status || 200);
   }
 
   if (path === 'save') {
@@ -519,6 +1101,34 @@ async function handle(req, env, uid, url) {
     }
   }
 
+  if (path === 'arena-feedback' && method === 'PUT') {
+    const value = await readBody(req) || {};
+    const allowedLiked = new Set(['yes', 'mixed', 'no']);
+    const allowedOutcome = new Set(['win', 'loss']);
+    const feedbackId = /^[A-Za-z0-9_-]{8,80}$/.test(String(value.feedbackId || ''))
+      ? String(value.feedbackId) : crypto.randomUUID();
+    const arenaVersion = boundedText(value.arenaVersion, 40) || 'arena-mvp-coins-v1';
+    const runCount = Math.max(0, Math.min(9999, Math.floor(Number(value.runCount) || 0)));
+    const liked = allowedLiked.has(String(value.liked)) ? String(value.liked) : '';
+    const likedPoints = Array.isArray(value.likedPoints)
+      ? value.likedPoints.map(v => boundedText(v, 32)).filter(Boolean).slice(0, 2).join('|')
+      : boundedText(value.likedPoints, 80);
+    const dislikedPoint = boundedText(value.dislikedPoint, 40);
+    const suggestion = boundedText(value.suggestion, 240);
+    const outcome = allowedOutcome.has(String(value.outcome)) ? String(value.outcome) : '';
+    const durationSec = Math.max(0, Math.min(3600, Math.floor(Number(value.durationSec) || 0)));
+    const level = Math.max(0, Math.min(999, Math.floor(Number(value.level) || 0)));
+    const roleDex = Math.max(0, Math.min(9999, Math.floor(Number(value.roleDex) || 0)));
+    if (!liked || !runCount || !outcome) return json({ error: 'invalid_feedback' }, 400);
+    await env.pokesurvivor_data.prepare(
+      `INSERT OR IGNORE INTO arena_feedback
+       (feedback_id, uid, arena_version, run_count, liked, liked_points, disliked_point, suggestion, outcome, duration_sec, level, role_dex, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(feedbackId, uid, arenaVersion, runCount, liked, likedPoints, dislikedPoint,
+      suggestion, outcome, durationSec, level, roleDex, Date.now()).run();
+    return json({ ok: true, feedbackId });
+  }
+
   if (path === 'collection') {
     if (method === 'GET') {
       const uids = (url.searchParams.get('uids') || '').split(',').filter(Boolean).slice(0, 30);
@@ -526,8 +1136,28 @@ async function handle(req, env, uid, url) {
     }
     if (method === 'PUT') {
       const value = await readBody(req) || {};
-      const row = { uid, name: String(value.name || '???').slice(0, 32), score: Number(value.score || 0) | 0,
-        ownedCount: Number(value.ownedCount || 0) | 0, shinyCount: Number(value.shinyCount || 0) };
+      const saveRow = await env.pokesurvivor_data.prepare('SELECT payload FROM saves WHERE uid = ?').bind(uid).first();
+      const save = saveRow ? parse(saveRow.payload, null) : null;
+      if (!save || save.syncV !== 2) return json({ error: 'save_required' }, 409);
+      const serverOwnedCount = objectKeyCount(save.owned);
+      const serverShinyCount = objectKeyCount(save.shiny);
+      const ownedCount = Number(value.ownedCount);
+      const shinyCount = Number(value.shinyCount);
+      const score = Number(value.score);
+      // Counts must come from the server save. Shiny is allowed to be lower
+      // than the raw save count because the client excludes unsupported shiny
+      // sprites, but it can never be higher than the save itself.
+      const maxScore = serverOwnedCount * 25 + Math.max(0, Math.min(serverShinyCount, shinyCount)) * 50;
+      if (!Number.isSafeInteger(ownedCount) || ownedCount < 0 || ownedCount !== serverOwnedCount ||
+          !Number.isSafeInteger(shinyCount) || shinyCount < 0 || shinyCount > serverShinyCount ||
+          !Number.isSafeInteger(score) || score < 0 || score > maxScore) {
+        return json({ error: 'collection_mismatch' }, 409);
+      }
+      // Quarantined accounts keep their save and can continue playing, but
+      // cannot reappear in public collection rankings until reviewed.
+      if (await leaderboardHidden(env, uid)) return json({ ok: true, hidden: true });
+      const row = { uid, name: String(value.name || '???').slice(0, 32), score,
+        ownedCount, shinyCount };
       await env.pokesurvivor_data.prepare(
         `INSERT INTO collections(uid, name, score, owned_count, shiny_count, payload, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(uid) DO UPDATE SET name=excluded.name, score=excluded.score, owned_count=excluded.owned_count, shiny_count=excluded.shiny_count, payload=excluded.payload, updated_at=excluded.updated_at`
@@ -564,10 +1194,15 @@ async function handle(req, env, uid, url) {
     catch (e) { return json({ error: e.message || 'invalid ranking payload' }, 400); }
   }
   if (path === 'ranking/remove' && method === 'DELETE') {
-    await env.pokesurvivor_data.prepare(
-      `DELETE FROM ranking_entries
-       WHERE EXISTS (SELECT 1 FROM json_each(json_extract(payload, '$.uids')) WHERE value = ?)`
-    ).bind(uid).run();
+    await env.pokesurvivor_data.batch([
+      env.pokesurvivor_data.prepare(
+        `DELETE FROM ranking_entries
+         WHERE (board, entry_id) IN (
+           SELECT board, entry_id FROM ranking_entry_members WHERE uid = ?
+         )`
+      ).bind(uid),
+      env.pokesurvivor_data.prepare('DELETE FROM ranking_entry_members WHERE uid = ?').bind(uid)
+    ]);
     return json({ ok: true });
   }
 
@@ -676,9 +1311,22 @@ async function handle(req, env, uid, url) {
       env.pokesurvivor_data.prepare('DELETE FROM profiles WHERE uid = ?').bind(uid),
       env.pokesurvivor_data.prepare('DELETE FROM names WHERE uid = ?').bind(uid),
       env.pokesurvivor_data.prepare('DELETE FROM presence WHERE uid = ?').bind(uid),
+      env.pokesurvivor_data.prepare('DELETE FROM arena_feedback WHERE uid = ?').bind(uid),
+      env.pokesurvivor_data.prepare('DELETE FROM arena_reward_claims WHERE uid = ?').bind(uid),
+      env.pokesurvivor_data.prepare('DELETE FROM share_rewards WHERE uid = ?').bind(uid),
+      env.pokesurvivor_data.prepare('DELETE FROM arena_queue WHERE uid = ?').bind(uid),
+      env.pokesurvivor_data.prepare('DELETE FROM arena_match_events WHERE uid = ?').bind(uid),
+      env.pokesurvivor_data.prepare('DELETE FROM arena_match_players WHERE uid = ?').bind(uid),
+      env.pokesurvivor_data.prepare('DELETE FROM arena_wallet_ledger WHERE uid = ?').bind(uid),
       env.pokesurvivor_data.prepare('DELETE FROM invites WHERE to_uid = ? OR from_uid = ?').bind(uid, uid),
       env.pokesurvivor_data.prepare('DELETE FROM friendships WHERE from_uid = ? OR to_uid = ?').bind(uid, uid),
-      env.pokesurvivor_data.prepare(`DELETE FROM ranking_entries WHERE EXISTS (SELECT 1 FROM json_each(json_extract(payload, '$.uids')) WHERE value = ?)`).bind(uid)
+      env.pokesurvivor_data.prepare(
+        `DELETE FROM ranking_entries
+         WHERE (board, entry_id) IN (
+           SELECT board, entry_id FROM ranking_entry_members WHERE uid = ?
+         )`
+      ).bind(uid),
+      env.pokesurvivor_data.prepare('DELETE FROM ranking_entry_members WHERE uid = ?').bind(uid)
     ]);
     return json({ ok: true });
   }
@@ -686,6 +1334,368 @@ async function handle(req, env, uid, url) {
 }
 
 // ---------------- ephemeral multiplayer rooms ----------------
+
+// The queue is a singleton Durable Object on purpose: one serialized queue
+// means a burst of 160 clicks is deterministically split into 20 groups of 8.
+export class ArenaMatchmaker {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.ready = state.blockConcurrencyWhile(async () => {});
+  }
+
+  async fetch(req) {
+    await this.ready;
+    return this.state.blockConcurrencyWhile(async () => {
+      const uid = req.headers.get('X-PS-UID') || '';
+      if (!uid) return json({ error: 'unauthorized' }, 401);
+      const env = this.env;
+      if (!env) return json({ error: 'arena_unavailable' }, 503);
+      if (req.method === 'POST') return json(await arenaChargeAndQueue(env, uid, await readBody(req) || {}));
+      if (req.method === 'GET') return json(await arenaCurrent(env, uid));
+      if (req.method === 'DELETE') return json(await arenaRefundQueued(env, uid));
+      return json({ error: 'method_not_allowed' }, 405);
+    });
+  }
+}
+
+function arenaSafeState(value) {
+  const v = value && typeof value === 'object' ? value : {};
+  const number = (n, min, max) => Number.isFinite(Number(n)) ? Math.max(min, Math.min(max, Number(n))) : 0;
+  return {
+    seq: Math.max(0, Math.floor(number(v.seq, 0, 1e9))),
+    x: number(v.x, -5000, 5000), y: number(v.y, -5000, 5000),
+    hp: number(v.hp, 0, 1e7), maxHp: number(v.maxHp, 1, 1e7),
+    damageTaken: number(v.damageTaken, 0, 1e8),
+    level: Math.floor(number(v.level, 1, 200)),
+    kills: Math.floor(number(v.kills, 0, 7)), damage: number(v.damage, 0, 1e8),
+    pveKills: Math.floor(number(v.pveKills, 0, 100000)),
+    skillCasts: Math.floor(number(v.skillCasts, 0, 100000)),
+    dead: !!v.dead, at: Date.now()
+  };
+}
+
+function arenaSafeAction(value) {
+  const v = value && typeof value === 'object' ? value : {};
+  return {
+    seq: Math.max(0, Math.min(1e9, Math.floor(Number(v.seq) || 0))),
+    move: String(v.move || '').slice(0, 40),
+    aim: Math.max(-Math.PI * 2, Math.min(Math.PI * 2, Number(v.aim) || 0)),
+    at: Date.now()
+  };
+}
+
+// The browser owns presentation and input latency, but the room rejects
+// impossible state jumps before relaying them. This is intentionally
+// conservative: a dead player cannot resurrect, counters only move forward,
+// and suspicious corrections are retained as incidents for later review.
+function arenaValidatedState(value, previous) {
+  const next = arenaSafeState(value);
+  if (!previous) return { state: next, incidents: [] };
+  if (next.seq <= previous.seq) return { state: null, incidents: [] };
+  const incidents = [];
+  const elapsed = Math.max(0.05, (Date.now() - Number(previous.at || 0)) / 1000);
+  const maxStep = 260 * elapsed + 80;
+  const dx = next.x - previous.x, dy = next.y - previous.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance > maxStep) {
+    if (distance > maxStep * 1.75) {
+      incidents.push({ kind: 'movement_jump', severity: 'warn', payload: {
+        seq: next.seq, distance: Math.round(distance), maxStep: Math.round(maxStep)
+      } });
+    }
+    const scale = maxStep / distance;
+    next.x = previous.x + dx * scale;
+    next.y = previous.y + dy * scale;
+  }
+  if (next.maxHp > previous.maxHp * 1.5 && next.maxHp - previous.maxHp > 50) {
+    incidents.push({ kind: 'max_hp_jump', severity: 'high', payload: {
+      seq: next.seq, previous: previous.maxHp, received: next.maxHp
+    } });
+  }
+  if (next.hp > previous.hp + Math.max(250, previous.maxHp * 0.75)) {
+    incidents.push({ kind: 'hp_jump', severity: 'warn', payload: {
+      seq: next.seq, previous: previous.hp, received: next.hp
+    } });
+  }
+  if (next.level > previous.level + 5) {
+    incidents.push({ kind: 'level_jump', severity: 'warn', payload: {
+      seq: next.seq, previous: previous.level, received: next.level
+    } });
+  }
+  if (next.kills > previous.kills + 3) {
+    incidents.push({ kind: 'kill_counter_jump', severity: 'warn', payload: {
+      seq: next.seq, previous: previous.kills, received: next.kills
+    } });
+  }
+  next.maxHp = previous.maxHp;
+  next.hp = previous.dead ? 0 : Math.min(next.hp, next.maxHp);
+  next.level = Math.max(previous.level, next.level);
+  next.kills = Math.max(previous.kills, next.kills);
+  next.damage = Math.max(previous.damage, next.damage);
+  next.damageTaken = Math.max(previous.damageTaken || 0, next.damageTaken);
+  next.pveKills = Math.max(previous.pveKills || 0, next.pveKills);
+  next.skillCasts = Math.max(previous.skillCasts || 0, next.skillCasts);
+  next.dead = !!previous.dead || !!next.dead;
+  return { state: next, incidents };
+}
+
+export class ArenaRoom {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.matchId = '';
+    this.sockets = new Map();
+    this.socketUids = new Map();
+    this.pending = new Set();
+    this.latest = {};
+    this.actionSeq = new Map();
+    this.actionAt = new Map();
+    this.telemetryAt = new Map();
+    this.telemetrySeq = new Map();
+    this.startedAt = 0;
+    this.ready = state.blockConcurrencyWhile(async () => {
+      this.latest = await state.storage.get('latest') || {};
+      this.matchId = await state.storage.get('matchId') || '';
+    });
+  }
+
+  send(socket, value) { try { socket.send(JSON.stringify(value)); } catch (e) { /* disconnected */ } }
+
+  broadcast(value, except = '') {
+    for (const [uid, socket] of this.sockets) if (uid !== except) this.send(socket, value);
+  }
+
+  async snapshot(env) {
+    const snapshot = await arenaSnapshot(env, this.matchId, '');
+    if (snapshot) snapshot.latest = this.latest;
+    return snapshot;
+  }
+
+  async touch(env, uid, status = 'connected', reconnect = false) {
+    await env.pokesurvivor_data.prepare(
+      `UPDATE arena_match_players SET status = CASE WHEN status IN ('dead','withdrawn') THEN status ELSE ? END,
+          last_seen_at = ?, reconnect_until = ?, reconnects = reconnects + ?
+        WHERE match_id = ? AND uid = ?`
+    ).bind(status, Date.now(), Date.now() + ARENA_ONLINE.reconnectMs, reconnect ? 1 : 0, this.matchId, uid).run();
+  }
+
+  async fetch(req) {
+    await this.ready;
+    this.matchId = req.headers.get('X-PS-MATCH') || this.matchId;
+    if (this.matchId) await this.state.storage.put('matchId', this.matchId);
+    if ((req.headers.get('Upgrade') || '').toLowerCase() !== 'websocket') return json({ error: 'websocket required' }, 426);
+    const [client, server] = Object.values(new WebSocketPair());
+    server.accept();
+    this.pending.add(server);
+    server.addEventListener('message', event => this.message(server, event.data).catch(error => {
+      console.error('[arena-room]', error);
+      this.send(server, { type: 'error', error: 'arena_room_error' });
+    }));
+    server.addEventListener('close', () => this.disconnect(server).catch(() => {}));
+    this.state.storage.setAlarm(Date.now() + 15000);
+    return new Response(null, { status: 101, webSocket: client, headers: { 'Sec-WebSocket-Protocol': 'ps-v1' } });
+  }
+
+  async message(socket, raw) {
+    let value;
+    try { value = JSON.parse(raw); } catch (e) { return; }
+    if (!value || typeof value.type !== 'string') return;
+    let uid = this.socketUids.get(socket) || '';
+    if (!uid) {
+      if (value.type !== 'auth' || typeof value.token !== 'string') {
+        this.send(socket, { type: 'auth', ok: false, error: 'unauthorized' });
+        try { socket.close(4003, 'unauthorized'); } catch (e) { /* nada */ }
+        return;
+      }
+      uid = await verify(value.token);
+      if (!uid) {
+        this.send(socket, { type: 'auth', ok: false, error: 'unauthorized' });
+        try { socket.close(4003, 'unauthorized'); } catch (e) { /* nada */ }
+        return;
+      }
+      this.pending.delete(socket);
+      const old = this.sockets.get(uid);
+      if (old && old !== socket) { this.socketUids.delete(old); try { old.close(4001, 'replaced'); } catch (e) { /* nada */ } }
+      this.sockets.set(uid, socket);
+      this.socketUids.set(socket, uid);
+      this.send(socket, { type: 'auth', ok: true });
+      return;
+    }
+    const env = this.env;
+    if (!env) return;
+    if (value.type === 'join') {
+      const row = await env.pokesurvivor_data.prepare(
+        `SELECT p.status, p.reconnect_until AS reconnectUntil, m.status AS matchStatus,
+                m.started_at AS startedAt
+           FROM arena_match_players p JOIN arena_matches m ON m.match_id = p.match_id
+          WHERE p.match_id = ? AND p.uid = ?`
+      ).bind(this.matchId, uid).first();
+      if (!row || !['running', 'settling', 'settled'].includes(row.matchStatus)) return this.send(socket, { type: 'error', error: 'arena_match_not_found' });
+      if (row.status === 'dead') return this.send(socket, { type: 'error', error: 'player_eliminated' });
+      if (row.status === 'withdrawn' || Number(row.reconnectUntil) < Date.now()) {
+        if (row.status !== 'withdrawn') {
+          await env.pokesurvivor_data.prepare(
+            `UPDATE arena_match_players SET status = 'withdrawn', death_at = ?, last_seen_at = ?, reconnect_until = 0
+              WHERE match_id = ? AND uid = ? AND status IN ('reserved', 'connected', 'playing')`
+          ).bind(Date.now(), Date.now(), this.matchId, uid).run();
+          await arenaTrySettle(env, this.matchId, 'reconnect_expired');
+        }
+        return this.send(socket, { type: 'error', error: 'reconnect_expired' });
+      }
+      this.startedAt = Number(row.startedAt) || this.startedAt || Date.now();
+      const isReconnect = row.status === 'connected' || row.status === 'playing';
+      await this.touch(env, uid, row.status === 'dead' ? 'dead' : 'connected', isReconnect);
+      const snapshot = await this.snapshot(env);
+      this.send(socket, { type: 'arena', match: snapshot });
+      this.broadcast({ type: 'arena', match: snapshot }, uid);
+      return;
+    }
+    const player = await env.pokesurvivor_data.prepare(
+      'SELECT 1 AS ok FROM arena_match_players WHERE match_id = ? AND uid = ?'
+    ).bind(this.matchId, uid).first();
+    if (!player) return this.send(socket, { type: 'error', error: 'arena_player_not_found' });
+    if (value.type === 'heartbeat') { await this.touch(env, uid); return; }
+    if (value.type === 'state') {
+      const previous = this.latest[uid];
+      const audit = arenaValidatedState(value.state, previous);
+      const state = audit.state;
+      if (!state) return;
+      const becameDead = state.dead && !previous?.dead;
+      this.latest[uid] = { uid, ...state };
+      await this.state.storage.put('latest', this.latest);
+      await this.touch(env, uid, state.dead ? 'dead' : 'playing');
+      const elapsedSec = Math.floor(Math.max(0, (Date.now() - Number(this.startedAt || Date.now())) / 1000));
+      for (const incident of audit.incidents) {
+        await arenaRecordIncident(env, this.matchId, uid, incident.kind, incident.severity,
+          Object.assign({}, incident.payload, { elapsedSec }));
+      }
+      const now = Date.now();
+      if (now - (this.telemetryAt.get(uid) || 0) >= ARENA_ONLINE.telemetryMs) {
+        const sampleSeq = (this.telemetrySeq.get(uid) || 0) + 1;
+        this.telemetryAt.set(uid, now);
+        this.telemetrySeq.set(uid, sampleSeq);
+        await arenaRecordTelemetry(env, this.matchId, uid, state, elapsedSec, sampleSeq, {
+          gas: elapsedSec >= ARENA_RULES.gasStartSec,
+          frenzy: elapsedSec >= ARENA_RULES.frenzyStartSec,
+          corrected: audit.incidents.length > 0
+        });
+      }
+      if (becameDead) {
+        await arenaReport(env, uid, {
+          matchId: this.matchId,
+          eventType: 'dead',
+          eventId: arenaId('state_dead'),
+          elapsedSec,
+          level: state.level,
+          kills: state.kills,
+          damage: state.damage,
+          damageTaken: state.damageTaken,
+          pveKills: state.pveKills,
+          skillCasts: state.skillCasts
+        });
+      }
+      this.broadcast({ type: 'state', state: this.latest[uid] }, uid);
+      return;
+    }
+    if (value.type === 'action') {
+      const action = arenaSafeAction(value.action);
+      const previousSeq = this.actionSeq.get(uid) || 0;
+      const now = Date.now();
+      if (action.seq <= previousSeq || now - (this.actionAt.get(uid) || 0) < 70) return;
+      this.actionSeq.set(uid, action.seq);
+      this.actionAt.set(uid, now);
+      await env.pokesurvivor_data.batch([
+        env.pokesurvivor_data.prepare(
+          `UPDATE arena_match_players SET action_count = action_count + 1,
+             skill_casts = skill_casts + 1 WHERE match_id = ? AND uid = ?`
+        ).bind(this.matchId, uid),
+        env.pokesurvivor_data.prepare(
+          `UPDATE arena_matches SET server_actions = server_actions + 1 WHERE match_id = ?`
+        ).bind(this.matchId)
+      ]);
+      this.broadcast({ type: 'action', uid, action }, uid);
+      return;
+    }
+    if (value.type === 'leave') {
+      const result = await arenaReport(env, uid, { matchId: this.matchId, eventType: 'withdrawn', elapsedSec: 0, eventId: arenaId('leave') });
+      // An explicit leave is a forfeit, not a transient network disconnect.
+      // Clear the reconnect lease so a user cannot leave and re-enter the same
+      // paid match to scout or duplicate a settlement.
+      await env.pokesurvivor_data.prepare(
+        `UPDATE arena_match_players SET reconnect_until = 0
+          WHERE match_id = ? AND uid = ? AND status = 'withdrawn'`
+      ).bind(this.matchId, uid).run();
+      if (result && result.match) this.broadcast({ type: 'arena', match: result }, '');
+      try { socket.close(1000, 'left'); } catch (e) { /* nada */ }
+      return;
+    }
+    if (value.type === 'report') {
+      const result = await arenaReport(env, uid, Object.assign({}, value.report || {}, { matchId: this.matchId }));
+      this.send(socket, { type: 'report', result });
+      if (result && result.match) this.broadcast({ type: 'arena', match: result }, '');
+    }
+  }
+
+  async disconnect(socket) {
+    this.pending.delete(socket);
+    const uid = this.socketUids.get(socket);
+    if (!uid || this.sockets.get(uid) !== socket) return;
+    this.sockets.delete(uid); this.socketUids.delete(socket);
+    if (this.env && this.matchId) {
+      await this.env.pokesurvivor_data.prepare(
+        `UPDATE arena_match_players SET disconnects = disconnects + 1, last_seen_at = ?
+          WHERE match_id = ? AND uid = ? AND status NOT IN ('dead','withdrawn')`
+      ).bind(Date.now(), this.matchId, uid).run();
+    }
+    if (this.sockets.size === 0) this.state.storage.setAlarm(Date.now() + 15000);
+  }
+
+  async alarm() {
+    const env = this.env;
+    if (!env || !this.matchId) return;
+    const now = Date.now();
+    await env.pokesurvivor_data.prepare(
+      `UPDATE arena_match_players SET status = 'withdrawn', death_at = ?, last_seen_at = ?
+        WHERE match_id = ? AND status IN ('reserved','connected','playing') AND reconnect_until < ?`
+    ).bind(now, now, this.matchId, now).run();
+    const match = await env.pokesurvivor_data.prepare(
+      'SELECT status, started_at AS startedAt FROM arena_matches WHERE match_id = ?'
+    ).bind(this.matchId).first();
+    if (match && match.status === 'running') {
+      // A disconnected or cheating client must never keep a paid room alive
+      // forever. The browser still renders the 10:00 gas + 60 second frenzy,
+      // while this server-side cutoff provides the final authoritative guard.
+      if (Number(match.startedAt) && now >= Number(match.startedAt) + ARENA_ONLINE.maxDurationSec * 1000) {
+        const rows = await env.pokesurvivor_data.prepare(
+          `SELECT uid, seat, status FROM arena_match_players
+             WHERE match_id = ? AND status IN ('connected', 'playing') ORDER BY seat ASC`
+        ).bind(this.matchId).all();
+        const active = rows.results || [];
+        if (active.length) {
+          const score = row => {
+            const latest = this.latest[row.uid] || {};
+            const hp = Number(latest.hp), maxHp = Math.max(1, Number(latest.maxHp) || 1);
+            return [latest.dead ? 0 : 1, Number.isFinite(hp) ? hp / maxHp : 0,
+              Number(latest.level) || 1, Number(latest.kills) || 0,
+              Number(latest.damage) || 0, -Number(row.seat)];
+          };
+          active.sort((a, b) => {
+            const aa = score(a), bb = score(b);
+            for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return bb[i] - aa[i];
+            return 0;
+          });
+          await env.pokesurvivor_data.batch(active.map((row, index) => env.pokesurvivor_data.prepare(
+            `UPDATE arena_match_players SET status = ?, death_at = CASE WHEN ? = 'dead' THEN ? ELSE death_at END,
+                last_seen_at = ? WHERE match_id = ? AND uid = ? AND status IN ('connected', 'playing')`
+          ).bind(index === 0 ? 'playing' : 'dead', index === 0 ? 'playing' : 'dead', now, now, this.matchId, row.uid)));
+        }
+      }
+      await arenaTrySettle(env, this.matchId, 'timeout');
+      this.state.storage.setAlarm(Date.now() + 15000);
+    }
+  }
+}
 
 function roomMember(uid, value) {
   const v = value && typeof value === 'object' ? value : {};
@@ -873,6 +1883,17 @@ export default {
     if (url.pathname === '/v1/waffo/webhook' && req.method === 'POST') {
       return waffoWebhookRequest(req, env);
     }
+    if (url.pathname === '/v1/arena/ws' && (req.headers.get('Upgrade') || '').toLowerCase() === 'websocket') {
+      const matchId = url.searchParams.get('match') || '';
+      if (!/^am_[A-Za-z0-9]{20,64}$/.test(matchId)) return json({ error: 'arena_match' }, 400, headers);
+      const token = websocketToken(req, url);
+      const uid = token ? await verify(token) : '';
+      if (token && !uid) return json({ error: 'unauthorized' }, 401, headers);
+      const h = new Headers(req.headers);
+      h.set('X-PS-UID', uid); h.set('X-PS-MATCH', matchId);
+      const stub = env.ARENA_ROOMS.get(env.ARENA_ROOMS.idFromName(matchId));
+      return stub.fetch(new Request(req, { headers: h }));
+    }
     if (url.pathname === '/v1/room/ws' && (req.headers.get('Upgrade') || '').toLowerCase() === 'websocket') {
       const roomId = url.searchParams.get('room') || '';
       if (!/^[A-Za-z0-9_-]{8,64}$/.test(roomId)) return json({ error: 'room' }, 400, headers);
@@ -887,6 +1908,14 @@ export default {
     const uid = await verify((req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''));
     if (!uid) return json({ error: 'unauthorized' }, 401, headers);
     try {
+      if (url.pathname === '/v1/arena/queue') {
+        const h = new Headers(req.headers);
+        h.set('X-PS-UID', uid);
+        const stub = env.ARENA_MATCHMAKER.get(env.ARENA_MATCHMAKER.idFromName('global'));
+        const response = await stub.fetch(new Request(req, { headers: h }));
+        Object.entries(headers).forEach(([k, v]) => response.headers.set(k, v));
+        return response;
+      }
       const response = await handle(req, env, uid, url);
       Object.entries(headers).forEach(([k, v]) => response.headers.set(k, v));
       return response;

@@ -18,6 +18,18 @@ database_id = "2835d689-b29f-4757-bb9d-5fb224016384"
 name = "ROOMS"
 class_name = "Room"
 
+[[durable_objects.bindings]]
+name = "ARENA_MATCHMAKER"
+class_name = "ArenaMatchmaker"
+
+[[durable_objects.bindings]]
+name = "ARENA_ROOMS"
+class_name = "ArenaRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["ArenaMatchmaker", "ArenaRoom"]

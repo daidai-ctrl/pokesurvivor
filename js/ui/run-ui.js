@@ -1,14 +1,31 @@
 /* ============ run-ui.js — cartas de nivel, pausa y fin de run ============ */
 G.RunUI = (() => {
   const $ = G.UI.$;
+  const ARENA_CHOICE_MS = 8000;
   let offers = null, offerCb = null, coopMode = false;
+  let arenaChoice = false, arenaChoiceDeadline = 0;
+
+  function stopArenaChoice() {
+    arenaChoice = false;
+    arenaChoiceDeadline = 0;
+  }
+
+  function updateArenaChoiceText() {
+    if (!arenaChoice || !arenaChoiceDeadline) return;
+    const seconds = Math.max(0, Math.ceil((arenaChoiceDeadline - performance.now()) / 1000));
+    $('lvl-wait').textContent = `La batalla continúa · elige en ${seconds}s o se elegirá la primera carta`;
+  }
 
   /** @param coop  en grupo: tras elegir, se queda esperando a los demás */
   function showLevelUp(level, list, cb, coop = false) {
+    stopArenaChoice();
     offerCb = cb; coopMode = coop;
+    arenaChoice = !coop && G.Game && G.Game.mode === 'arena';
+    if (arenaChoice) arenaChoiceDeadline = performance.now() + ARENA_CHOICE_MS;
     $('lvl-num').textContent = level;
     $('lvl-wait').textContent = '';
-    $('lvl-wait').classList.toggle('hidden', !coop);
+    $('lvl-wait').classList.toggle('hidden', !(coop || arenaChoice));
+    updateArenaChoiceText();
     $('cards').classList.remove('done');
     renderCards(list);
     $('lvl-reroll').onclick = reroll;
@@ -62,6 +79,7 @@ G.RunUI = (() => {
   function pick(i) {
     if (!offers || !offers[i]) return;
     const c = offers[i], cb = offerCb;
+    stopArenaChoice();
     offers = null; offerCb = null;
     $('lvl-reroll').classList.add('hidden');
     if (coopMode) {
@@ -84,6 +102,7 @@ G.RunUI = (() => {
   }
 
   function closeLevelUp() {
+    stopArenaChoice();
     offers = null; offerCb = null;
     $('cards').classList.remove('done');
     G.UI.hide('scr-levelup');
@@ -232,5 +251,15 @@ G.RunUI = (() => {
     $('btn-quit').onclick = onQuit;
   }
 
-  return { showLevelUp, reroll, showItemChoice, showBond, pickBond, bondBack, pick, setWaiting, closeLevelUp, showOver, wirePause, showPause };
+  /**
+   * Arena 的倒计时使用真实时间，而不是游戏时间；即使测试调速，也不会
+   * 因为加速而瞬间吃掉技能选择窗口。超时默认选第一张预先生成的卡。
+   */
+  function tick() {
+    if (!arenaChoice || !offers || !arenaChoiceDeadline) return;
+    if (performance.now() >= arenaChoiceDeadline) return pick(0);
+    updateArenaChoiceText();
+  }
+
+  return { showLevelUp, reroll, showItemChoice, showBond, pickBond, bondBack, pick, setWaiting, closeLevelUp, showOver, wirePause, showPause, tick };
 })();

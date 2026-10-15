@@ -1,0 +1,139 @@
+{
+  "model": {
+    "trials": 10000,
+    "roster": 103,
+    "playersNearby": 0,
+    "map": "Arena normal theme, 48-tile radius; deterministic walls/pillars/trees from world.js",
+    "damageConstants": {
+      "monsterDamageScale": 2.4,
+      "arenaMonsterDamage": 0.65,
+      "gasStartSec": 600,
+      "frenzyStartSec": 660
+    },
+    "note": "This is an offline route/occlusion regression sampler, not a replacement for server-authoritative combat tests."
+  },
+  "counters": {
+    "samples": 10000,
+    "noNearbyHumanDamageSamples": 10000,
+    "expectedPvEDamage": 1137,
+    "exact17": 25,
+    "blockedContactWouldHaveHit": 29,
+    "blockedProjectileWouldHaveHit": 110,
+    "blockedBeamWouldHaveHit": 36,
+    "occludedDamageAccepted": 0,
+    "gasTicks": 913,
+    "source": {
+      "contact": 416,
+      "projectile": 405,
+      "beam": 165,
+      "zone": 151,
+      "gas": 913
+    }
+  },
+  "damageDistribution": {
+    "min": 2.4375,
+    "p50": 12.525082745447122,
+    "p95": 83.35915065812878,
+    "p99": 130.43018681251044,
+    "max": 218.14828756509795
+  },
+  "exact17Examples": [
+    {
+      "source": "zone",
+      "enemy": "Ponyta",
+      "behavior": "zoner",
+      "time": 287.5,
+      "damage": 16.85
+    },
+    {
+      "source": "contact",
+      "enemy": "Vibrava",
+      "behavior": "runner",
+      "time": 134.6,
+      "damage": 17.38
+    },
+    {
+      "source": "projectile",
+      "enemy": "Qwilfish",
+      "behavior": "fan",
+      "time": 449.2,
+      "damage": 16.79
+    },
+    {
+      "source": "zone",
+      "enemy": "Houndour",
+      "behavior": "zoner",
+      "time": 275.6,
+      "damage": 17.18
+    },
+    {
+      "source": "beam",
+      "enemy": "Abra",
+      "behavior": "beamer",
+      "time": 403.7,
+      "damage": 16.87
+    }
+  ],
+  "wallBlockedCases": {
+    "contact": [
+      {
+        "time": 298.37893625255674,
+        "distance": 40.04455356858671,
+        "def": "Voltorb"
+      },
+      {
+        "time": 264.187855347991,
+        "distance": 14.140874720178545,
+        "def": "Noctowl"
+      },
+      {
+        "time": 135.34247271716595,
+        "distance": 45.8234605519101,
+        "def": "Grubbin"
+      }
+    ],
+    "projectile": [
+      {
+        "time": 162.58383885025978,
+        "distance": 14.037833423353732,
+        "def": "Yamask"
+      },
+      {
+        "time": 436.3053520023823,
+        "distance": 174.9720228742808,
+        "def": "Floatzel"
+      },
+      {
+        "time": 293.5418975679204,
+        "distance": 187.29773349128664,
+        "def": "Barbaracle"
+      }
+    ],
+    "beam": [
+      {
+        "time": 534.0088371466845,
+        "distance": 237.68761322367936,
+        "def": "Mamoswine"
+      },
+      {
+        "time": 399.8037862032652,
+        "distance": 276.3343233289197,
+        "def": "Mamoswine"
+      },
+      {
+        "time": 333.5657385410741,
+        "distance": 111.84385091997683,
+        "def": "Malamar"
+      }
+    ]
+  },
+  "checks": {
+    "noPlayerCanCauseDamageInThisModel": true,
+    "wallBlockedDamageWasAccepted": 0,
+    "wallBlockedContactIsRejected": true,
+    "wallBlockedProjectileIsRejected": true,
+    "wallBlockedBeamIsRejected": true,
+    "noArenaBossOrClassicEventRoute": true,
+    "noArenaTrapRouteInNormalTheme": true
+  }
+}

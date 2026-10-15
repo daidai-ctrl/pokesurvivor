@@ -162,10 +162,18 @@ G.SettingsUI = (() => {
     }
     const nick = G.Social.me ? G.Social.me.name : (G.DB.user || '');
     const kind = G.DB.mode === 'local' ? 'Cuenta de este navegador' : G.DB.nameAccount ? 'Nombre y contraseña' : 'Google';
+    const canLinkGoogle = G.DB.mode === 'cloud' && G.DB.nameAccount;
+    const recovery = canLinkGoogle
+      ? section('Recuperación de cuenta', 'Para evitar perder el acceso: vincula Google mientras tienes la cuenta abierta. Se conserva tu UID y tu partida.')
+        + (G.DB.googleLinked
+          ? `<div class="set-row"><div class="grow"><b>Google vinculado</b><small>Podrás usar este Google para recuperar el acceso a la misma cuenta.</small></div><span class="gold">OK</span></div>`
+          : `<div class="set-row"><div class="grow"><b>Vincular Google</b><small>El correo interno no recibe restablecimientos de contraseña. Vincula Google ahora; no se creará otra cuenta ni se moverá tu partida.</small></div><button class="btn small gold" id="set-google-link">Vincular Google</button></div>`)
+      : '';
     box.innerHTML = section('Cuenta')
       + `<div class="set-row"><div class="grow"><b>Apodo</b><small>Es único y no se puede cambiar.</small></div><span class="gold" translate="no">${esc(nick)}</span></div>`
       + `<div class="set-row"><div class="grow"><b>Tipo de cuenta</b></div><span>${esc(kind)}</span></div>`
       + `<div class="set-row"><div class="grow"><b>Partida</b></div><span>${esc(SYNC[st] || st)}</span></div>`
+      + recovery
       + `<div class="row wrap" style="gap:8px;margin-top:12px">
            <button class="btn" id="set-logout">Cerrar sesión</button>
            <button class="btn danger" id="set-delete">Borrar cuenta</button>
@@ -191,6 +199,19 @@ G.SettingsUI = (() => {
     box.querySelectorAll('[data-lang]').forEach(b => { b.onclick = () => { if (b.dataset.lang !== G.I18n.lang) G.I18n.set(b.dataset.lang); }; });
     const lo = $('set-login'); if (lo) lo.onclick = () => { close(); leave(); };
     const out = $('set-logout'); if (out) out.onclick = () => { close(); leave(); };
+    const linkGoogle = $('set-google-link');
+    if (linkGoogle) linkGoogle.onclick = async () => {
+      linkGoogle.disabled = true;
+      const r = await G.DB.linkGoogle();
+      if (!r.ok) {
+        const msg = $('set-msg');
+        if (msg && r.error) msg.textContent = r.error;
+        linkGoogle.disabled = false;
+        return;
+      }
+      if (G.Analytics) G.Analytics.event('link_google', { method: 'google' });
+      render();
+    };
     const del = $('set-delete');
     if (del) del.onclick = async () => {
       const ok = await G.UI.confirmDelete();

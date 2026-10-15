@@ -364,7 +364,8 @@
         if (dist < keep * 0.75) { vx = -ddx * spd * 0.8; vy = -ddy * spd * 0.8; }
         else if (dist < keep) { vx *= 0.1; vy *= 0.1; animBase = 'Idle'; }
         this.shotCd -= dt;
-        if (this.shotCd <= 0 && dist < range) {
+        const arenaSight = !G.Arena?.active || G.Arena.hasLineOfSight(this, pl, 4);
+        if (this.shotCd <= 0 && dist < range && arenaSight) {
           this.shotCd = this.def.shotCd || 2;
           this.special(pl, ddx, ddy);
         }

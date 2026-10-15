@@ -470,6 +470,25 @@ G.Player = class Player {
       i++;
     }
 
+    // Arena MVP: players get a compact marker above their head so they are
+    // never confused with the wild monsters on the same map. Monsters do not
+    // have this badge; normal solo/co-op players are unaffected.
+    if (this.arenaMarker) {
+      ctx.save();
+      const by = this.y - this.bodyH - (this.tag ? 22 : 12);
+      ctx.fillStyle = this.arenaMarker === 'TÚ' ? '#ffd23f' : '#7fe0ff';
+      ctx.strokeStyle = 'rgba(0,0,0,.82)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.rect(this.x - 10, by - 7, 20, 11);
+      ctx.fill(); ctx.stroke();
+      ctx.font = '700 6px Pixelify,"Segoe UI",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#10204b';
+      ctx.fillText(this.arenaMarker, this.x, by + 1);
+      ctx.restore();
+    }
+
     // Cooperativo: anillo de "reviviendo" y nombre encima.
     if (this.dead && this.reviveT > 0) {
       ctx.save();

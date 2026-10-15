@@ -21,6 +21,7 @@ G.Game = (() => {
   let pl = null;
   let caught = [];          // shinies conseguidos en esta run
   let biome = -1;
+  let runMode = 'solo';     // 'solo' | 'coop' | 'arena'
 
   const st = { get time() { return time; } };
 
@@ -84,16 +85,24 @@ G.Game = (() => {
 
   // ---------------- run ----------------
 
-  /** @param coop  { seed, host, members } para una partida en grupo */
-  function startRun(coop = null) {
+  /**
+   * Starts the classic game loop.
+   * Arena MVP only changes the selected owned character; movement, map,
+   * skills, level-ups and touch controls remain the normal game systems.
+   */
+  function startRun(config = null) {
+    const arena = !!(config && config.mode === 'arena');
+    const coop = arena ? null : config;
+    runMode = arena ? 'arena' : coop ? 'coop' : 'solo';
     holdBy = []; awayBy = null;
     const save = G.DB.save;
-    G.Analytics.event('run_started', {
-      mode: coop ? 'coop' : 'solo',
+    if (!arena) G.Analytics.event('run_started', {
+      mode: runMode,
       players: coop && coop.members ? coop.members.length : 1,
       first_run: !save.stats.runs ? 'yes' : 'no'
     });
-    const mon = G.DEX_BY[save.partner];
+    const requestedDex = arena && Number(config.partnerDex) ? Number(config.partnerDex) : save.partner;
+    const mon = G.DEX_BY[requestedDex] || G.DEX_BY[save.partner];
     const perks = G.Upgrades.perks(G.DB.upgradesOf(mon.dex));
 
     G.UI.hideAll();
@@ -109,12 +118,17 @@ G.Game = (() => {
     G.Weather.reset();
     G.Path.clear();
     G.Hazards.clear();
-    G.World.reset(coop ? coop.seed : Math.floor(Math.random() * 1e6));
+    const worldSeed = coop ? coop.seed
+      : arena && Number.isFinite(Number(config.seed)) ? Number(config.seed)
+        : Math.floor(Math.random() * 1e6);
+    G.World.reset(worldSeed);
     G.World.setBiome(0, true);
     biome = 0;
-    time = 0; pendingLevels = 0;
+    time = arena ? Math.max(0, Number(config.initialElapsed) || 0) : 0;
+    pendingLevels = 0;
 
-    pl = new G.Player(mon, perks, !!save.partnerShiny && G.DB.ownsShiny(mon.dex));
+    const useShiny = !arena && !!save.partnerShiny && G.DB.ownsShiny(mon.dex);
+    pl = new G.Player(mon, perks, useShiny);
     banked = { t1: 0, t10: 0 };
     caught = [];
     // Atajos: movimientos con hueco fijo (save.pbind[dex] = [id del 1, id del 2, ...]),
@@ -130,6 +144,19 @@ G.Game = (() => {
       pl.setActive(0);
     }
 
+    // Arena always reuses the classic player/combat loop. Local bots are only
+    // a fixture; an online match passes its remote roster and no test bots.
+    if (arena && G.Arena) G.Arena.start({
+      maxPlayers: config.maxPlayers || 8,
+      testBots: config.testBots !== false,
+      botCount: config.botCount == null ? 7 : config.botCount,
+      online: !!config.onlineArena,
+      matchId: config.matchId || '',
+      initialElapsed: Math.max(0, Number(config.initialElapsed) || 0),
+      playerSeat: Number.isInteger(config.playerSeat) ? config.playerSeat : 0,
+      remotePlayers: Array.isArray(config.remotePlayers) ? config.remotePlayers : []
+    }, pl);
+
     if (coop) {
       G.Coop.begin(coop, pl, coopApi);
       G.Social.setPlaying(true);
@@ -139,20 +166,37 @@ G.Game = (() => {
     G.Sprites.preload([mon.dex], 8000, pl.shiny);
     G.Audio.music(G.BIOME_MUSIC[0]);
     // Para el ranking: el servidor apunta cuándo empezó la partida.
-    if (!coop || G.Coop.isHost) G.Ranking.runStarted(coop ? 'g' : 's');
+    if (!arena && (!coop || G.Coop.isHost)) G.Ranking.runStarted(coop ? 'g' : 's');
     deathT = 0;
     G.Guard.start(!!coop);
 
     state = 'playing';
   }
 
+  function leaveArena(openArena = true) {
+    if (runMode !== 'arena') return;
+    if (G.Arena) G.Arena.stop();
+    G.UI.hideAll();
+    G.FX.clear(); G.Projectiles.clear(); G.Combat.clearFields();
+    G.EnemyMgr.clear(); G.Pickups.clear(); G.Spawner.reset(); G.Rift.reset();
+    G.Events.reset(); G.Weather.reset(); G.Path.clear(); G.Hazards.clear();
+    state = 'ui'; runMode = 'solo'; pl = null;
+    G.Audio.music('village');
+    if (openArena && G.ArenaMVP) G.ArenaMVP.open(); else G.MenuUI.open();
+  }
+
   function quitRun() {
+    if (runMode === 'arena') { leaveArena(); return; }
     if (G.Coop.active) G.Coop.leave();
     endRun(false);
   }
 
   /** Todos los jugadores de la partida (tú primero). */
-  function everyone() { return G.Coop.active ? G.Coop.players() : [pl]; }
+  function everyone() {
+    if (G.Coop.active) return G.Coop.players();
+    if (runMode === 'arena' && G.Arena && G.Arena.active) return G.Arena.everyone();
+    return [pl];
+  }
 
   /** Experiencia que hace falta para el siguiente nivel (cofres con candado). */
   function levelXp() {
@@ -178,6 +222,8 @@ G.Game = (() => {
    */
   let banked = { t1: 0, t10: 0 };
   function bankTickets(save_ = true) {
+    // Arena MVP is a dry local preview: never write tickets to the account.
+    if (runMode === 'arena') return;
     const sv = G.DB.save;
     if (!sv || !pl) return;
     sv.tickets = sv.tickets || { t1: 0, t10: 0 };
@@ -256,7 +302,7 @@ G.Game = (() => {
   G.onRescue = (dex, name) => {
     if (!G.DB.save || !pl) return;
     const isNew = !G.DB.owns(dex);
-    if (isNew) { G.DB.grant(dex, 'rescue'); G.DB.commit(); }
+    if (isNew && runMode !== 'arena') { G.DB.grant(dex, 'rescue'); G.DB.commit(); }
     else pl.coins += 150;
     G.Spawner.say(isNew ? '¡' + name + ' se une a tu equipo!' : '¡' + name + ' te da las gracias! (+150 monedas, ya lo tenías)', 4);
     G.Audio.sfx('shinyGet');
@@ -266,9 +312,11 @@ G.Game = (() => {
   G.onShinyCaught = e => {
     if (!G.DB.save || !pl) return;
     if (G.Coop.isHost) G.Coop.shinyCaught(e);
-    const isNew = G.DB.grantShiny(e.dex, 'wild');
-    G.DB.save.stats.shinies++;
-    G.DB.commit();
+    const isNew = runMode === 'arena' ? false : G.DB.grantShiny(e.dex, 'wild');
+    if (runMode !== 'arena') {
+      G.DB.save.stats.shinies++;
+      G.DB.commit();
+    }
     caught.push({ dex: e.dex, isNew });
     G.Spawner.say(isNew ? '¡Has conseguido a ' + e.name + ' shiny!' : '¡Otro ' + e.name + ' shiny! (+300 monedas)', 4);
     if (!isNew) pl.coins += 300;
@@ -277,10 +325,11 @@ G.Game = (() => {
 
   function endRun(dead = true) {
     if (state === 'over' || !pl) return;
+    const arena = runMode === 'arena';
     const coop = !!pl.uid;                    // sólo las partidas en grupo le ponen uid
     const wasHost = !!pl.coopHost;
     const team = coop ? G.Coop.members.slice() : [];
-    G.Analytics.event('run_ended', {
+    if (!arena) G.Analytics.event('run_ended', {
       mode: coop ? 'coop' : 'solo',
       outcome: dead ? 'defeat' : 'abandoned',
       duration_sec: Math.floor(time),
@@ -305,26 +354,30 @@ G.Game = (() => {
     const clean = G.Guard.end();
     const record = clean && time > save.stats.bestTime;
 
-    save.coins += coins;
-    bankTickets(false);
-    save.stats.runs++;
-    save.stats.totalKills += pl.kills;
-    if (clean) {
-      save.stats.bestTime = Math.max(save.stats.bestTime, Math.floor(time));
-      if (coop) save.stats.bestGroupTime = Math.max(save.stats.bestGroupTime || 0, Math.floor(time));
-      save.stats.bestLevel = Math.max(save.stats.bestLevel, pl.level);
+    if (!arena) {
+      save.coins += coins;
+      bankTickets(false);
+      save.stats.runs++;
+      save.stats.totalKills += pl.kills;
+      if (clean) {
+        save.stats.bestTime = Math.max(save.stats.bestTime, Math.floor(time));
+        if (coop) save.stats.bestGroupTime = Math.max(save.stats.bestGroupTime || 0, Math.floor(time));
+        save.stats.bestLevel = Math.max(save.stats.bestLevel, pl.level);
+      }
+      save.stats.coinsEarned += coins;
+      G.Progress.event('runEnd', { time, level: pl.level, coins: pl.coins, types: pl.mon.types, group: coop });
+      G.Progress.checkAch();
+      G.DB.commit();
+      if (G.Social.me) G.Social.publishProfile();
     }
-    save.stats.coinsEarned += coins;
-    G.Progress.event('runEnd', { time, level: pl.level, coins: pl.coins, types: pl.mon.types, group: coop });
-    G.Progress.checkAch();
-    G.DB.commit();
-    if (G.Social.me) G.Social.publishProfile();
 
     // Ranking: en solitario cada uno lo suyo; en grupo lo sube el anfitrión.
     const mark = { t: Math.floor(time), lv: pl.level, kills: pl.kills };
-    if (!clean) G.UI.toast('Esta partida no cuenta para el ranking: se ha detectado algo raro');
-    else if (!coop) G.Ranking.submitSolo(Object.assign(mark, { dex: pl.dex, shiny: pl.shiny }));
-    else if (wasHost) G.Ranking.submitGroup(Object.assign(mark, { members: team }));
+    if (!arena) {
+      if (!clean) G.UI.toast('Esta partida no cuenta para el ranking: se ha detectado algo raro');
+      else if (!coop) G.Ranking.submitSolo(Object.assign(mark, { dex: pl.dex, shiny: pl.shiny }));
+      else if (wasHost) G.Ranking.submitGroup(Object.assign(mark, { members: team }));
+    }
 
     G.RunUI.showOver({
       dead, time, level: pl.level, kills: pl.kills, bosses: pl.bosses, coins, record, t1: pl.t1, t10: pl.t10,
@@ -544,11 +597,16 @@ G.Game = (() => {
     if (state === 'playing') G.Settings.sample(real);
     fpsAcc += real; fpsN++;
     if (fpsAcc >= 0.5) { fpsShown = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
-    frameDt = state === 'playing' ? dt : 0;
+    // Arena 的个人选技界面不能冻结战场：仍然推进地图、毒气、怪物和
+    // PvP。经典模式继续保留原来的全局暂停行为。
+    const arenaChoosing = state === 'levelup' && runMode === 'arena' && G.Arena && G.Arena.active;
+    frameDt = state === 'playing' || arenaChoosing ? dt : 0;
 
+    G.RunUI.tick();
     handleKeys();
 
     if (state === 'playing') update(dt);
+    else if (arenaChoosing) update(dt, false);
     else if (pl && state !== 'ui') { G.FX.update(dt * 0.25); pl.anim.update(dt * 0.25); }
     // La red se atiende siempre (también con las cartas de nivel abiertas).
     if (G.Coop.active && pl && state !== 'ui' && state !== 'over') G.Coop.tick(dt);
@@ -559,10 +617,19 @@ G.Game = (() => {
     G.Input.endFrame();
   }
 
-  function update(dt) {
+  function update(dt, allowLevelUp = true) {
     const coop = G.Coop.active;
     if (flashT > 0) flashT -= dt;
     G.Guard.tick(dt, time, pl);
+    // In Arena the player stays in the real map after being eliminated so the
+    // remaining fighters can finish. The overlay offers an explicit exit.
+    if (pl.dead && runMode === 'arena' && G.Arena && G.Arena.active) {
+      time += dt;
+      G.Arena.update(dt, time, pl);
+      G.FX.update(dt);
+      G.Camera.follow(pl.x, pl.y, dt);
+      return;
+    }
     // Tras caer, deja que se vea la animación de Faint antes del resumen.
     // (En la arena de la grieta no: allí caer sólo te echa de vuelta.)
     if (pl.dead && !coop && !G.Rift.inArena) {
@@ -587,6 +654,7 @@ G.Game = (() => {
 
     pl.frozen = coop && (G.UI.isOpen('scr-pause') || G.UI.isOpen('scr-item'));
     pl.update(dt);
+    if (runMode === 'arena' && G.Arena && G.Arena.active) G.Arena.update(dt, time, pl);
     if (coop) {
       for (const p of G.Coop.puppets()) { p.netUpdate(dt); G.Combat.ghostOrbit(p, dt, time); }
       if (pl.dead) reviveTick(dt);
@@ -602,6 +670,7 @@ G.Game = (() => {
     G.Combat.tick(dt, pl, time);
     G.Projectiles.update(dt, pl, G.EnemyMgr.all());
     G.Combat.resolve(dt, pl, time);
+    if (runMode === 'arena' && G.Arena && G.Arena.active && pl.dead) G.Arena.showEliminationExit();
     G.Combat.updateFields(dt);
     G.Pickups.update(dt, all, onCollect);
     G.Hazards.update(dt);
@@ -612,7 +681,7 @@ G.Game = (() => {
     G.FX.update(dt);
 
     G.Audio.music(G.Rift.inArena ? 'rift' : G.EnemyMgr.bossAlive() ? 'boss' : G.BIOME_MUSIC[biome % G.BIOME_MUSIC.length]);
-    if (!coop || G.Coop.isHost) maybeLevelUp();
+    if (allowLevelUp && (!coop || G.Coop.isHost)) maybeLevelUp();
     if (pl.bonds > 0) offerBond(true);
     if (G.Coop.isHost) checkAllDown(dt);
   }
@@ -669,13 +738,14 @@ G.Game = (() => {
     ctx.save();
     ctx.scale(G.Camera.scale, G.Camera.scale);
     G.Camera.apply(ctx);
-    drawScene(G.Camera, G.Coop.active ? [pl, ...G.Coop.puppets()] : [pl]);
+    drawScene(G.Camera, everyone());
     G.Projectiles.draw(ctx);
     G.Combat.drawAirFields(ctx);
     G.FX.draw(ctx);
     ctx.restore();
 
     G.Weather.draw(ctx, w, h, frameDt);
+    if (runMode === 'arena' && G.Arena && G.Arena.active) G.Arena.draw(ctx, w, h);
     G.World.drawVignette(ctx, w, h);
     // Niebla: la viñeta se cierra un poco (sin tapar el centro).
     const fog = G.Weather.vignette;
@@ -808,9 +878,14 @@ G.Game = (() => {
     togglePause,
     /** Abandona la partida en curso (p. ej. al cerrar sesión desde Ajustes). */
     quit() { if (state !== 'ui' && state !== 'over') quitRun(); },
+    /** Sale directamente de una sala Arena local tras la eliminación. */
+    leaveArena,
+    /** Abandona una partida Arena activa y vuelve al menú principal. */
+    leaveArenaToMenu() { leaveArena(false); },
     /** Para grabar vídeos: abre las cartas de subir de nivel. */
     debugLevelUp() { G.Guard.flag('debug'); pl.level++; pendingLevels++; },
-    toUI() { state = 'ui'; Backdrop.restore(); },
+    toUI() { if (G.Arena) G.Arena.stop(); state = 'ui'; runMode = 'solo'; Backdrop.restore(); },
+    get mode() { return runMode; },
     get state() { return state; }, get player() { return pl; }, st
   };
 })();

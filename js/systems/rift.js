@@ -34,6 +34,12 @@ G.Rift = (() => {
   // ---------------- grieta en el mapa ----------------
 
   function update(dt, pl, time) {
+    // The PvP Arena is self-contained: no rift portal or rift boss can
+    // interrupt a match or move players to a second map.
+    if (G.Arena && G.Arena.active) {
+      if (rift || arena) reset();
+      return;
+    }
     if (rift) {
       rift.t += dt;
       rift.ttl -= dt;

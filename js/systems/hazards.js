@@ -41,7 +41,14 @@ G.Hazards = (() => {
       if (!h.hit && h.t >= h.delay) {
         h.hit = true;
         detonate(h);
-        if (pl && !pl.dead && inside(h, pl.x, pl.y, pl.r)) { pl.invuln = 0; pl.hurt(h.dmg, h.type); }
+        // Beam attacks have a real origin, so Arena walls interrupt them just
+        // like projectile sprites. PvE keeps its existing behavior unchanged.
+        const arenaBeamBlocked = pl && G.Arena?.active && h.kind === 'beam'
+          && !G.Arena.hasLineOfSight(h, pl, 4);
+        if (pl && !pl.dead && !arenaBeamBlocked && inside(h, pl.x, pl.y, pl.r)) {
+          pl.invuln = 0;
+          pl.hurt(h.dmg, h.type);
+        }
       }
       if (h.hit && h.t >= h.delay + h.end) list.splice(i, 1);
     }

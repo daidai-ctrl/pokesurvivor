@@ -18,7 +18,7 @@ G.MenuUI = (() => {
   }
 
   function init() {
-    const ICON = { play: 'ball', dex: 'book', upgrades: 'up', gacha: 'ball4', goals: 'medal3', friends: 'friends', rank: 'trophy', settings: 'gear' };
+    const ICON = { play: 'ball', dex: 'book', upgrades: 'up', gacha: 'ball4', goals: 'medal3', friends: 'friends', rank: 'trophy', arena: 'trophy', settings: 'gear' };
     document.querySelectorAll('#scr-menu [data-go]').forEach(b => {
       b.insertAdjacentHTML('afterbegin', `<span class="mi-ico">${G.Icons.html(ICON[b.dataset.go], 26)}</span>`);
       b.dataset.sfx = b.dataset.go === 'play' ? 'confirm' : 'click';
@@ -31,6 +31,7 @@ G.MenuUI = (() => {
         else if (go === 'goals') G.GoalsUI.open();
         else if (go === 'friends') G.FriendsUI.open();
         else if (go === 'rank') G.RankingUI.open();
+        else if (go === 'arena') G.ArenaMVP.open();
         else if (go === 'settings') G.SettingsUI.open();
       };
     });
@@ -100,6 +101,7 @@ G.MenuUI = (() => {
     }
     G.InvitePop.refresh();
     if (G.ShareUI && G.ShareUI.refresh) G.ShareUI.refresh();
+    if (G.ArenaNotice && G.ArenaNotice.maybeShow) G.ArenaNotice.maybeShow();
   }
 
   function renderChampion() {
