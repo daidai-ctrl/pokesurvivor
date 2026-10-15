@@ -428,7 +428,7 @@
     <div class="row between">
       <div>
         <h2 id="arena-notice-title">Nuevo modo: Último Superviviente</h2>
-        <p id="arena-notice-subtitle" class="sub" style="margin:4px 0 0">Battle Royale · 皇家生存战</p>
+        <p id="arena-notice-subtitle" class="sub" style="margin:4px 0 0">Battle Royale · Último Superviviente</p>
       </div>
       <button id="arena-notice-close" class="btn small ghost" type="button" aria-label="Cerrar">×</button>
     </div>
@@ -463,45 +463,48 @@
   <div class="box wide arena-box">
     <div class="row between arena-head">
       <div>
-        <h2><span id="arena-title">Último Superviviente</span> <span id="arena-title-subtitle" class="sub" style="font-size:15px">· Battle Royale · 皇家生存战</span></h2>
+        <h2><span id="arena-title">Último Superviviente</span> <span id="arena-title-subtitle" class="sub" style="font-size:15px">· Battle Royale · Último Superviviente</span></h2>
         <p id="arena-description" class="sub">Modo de supervivencia para 8 jugadores. Usa el mapa, WASD/joystick y las habilidades del modo clásico; durante la prueba se usan monedas y no se descuentan tickets amarillos.</p>
       </div>
       <button class="btn small ghost" id="arena-menu">Salir al menú</button>
     </div>
     <div class="arena-rules panel">
-      <span><b>8</b> plazas</span><span><b>100</b> monedas para entrar</span><span>premio previsto: <b>700</b></span>
-      <span>地图：圆形直径 96 格</span><span>10:00 + 60 s de gas furioso</span>
-      <span>角色平衡 v3 · 103 角色 · 怪物经典刷新量 · HP 72% · 伤害 65%</span>
-      <span>仅普通怪物 · 无裂缝 / Boss / 随机事件</span>
+      <span id="arena-rule-slots"><b>8</b> plazas</span><span id="arena-rule-entry"><b>100</b> monedas para entrar</span><span id="arena-rule-prize-label">premio previsto: <b>700</b></span>
+      <span id="arena-rule-map">Mapa: diámetro circular de 96 casillas</span><span id="arena-rule-gas">10:00 + 60 s de gas furioso</span>
+      <span id="arena-rule-balance">Equilibrio de personajes v3 · 103 personajes · aparición clásica de monstruos · HP 72 % · daño 65 %</span>
+      <span id="arena-rule-monsters">Sólo monstruos normales · sin grietas / jefes / eventos aleatorios</span>
     </div>
     <div class="arena-setup" id="arena-setup">
       <div class="panel arena-role-panel">
-        <h3>Elige un legendario que ya tengas</h3>
-        <p class="note" style="margin:4px 0 8px">Sólo aparecen personajes propios de rareza legendaria. No hay límite de jugadores por personaje; el límite futuro será sólo de plazas de la sala.</p>
+        <h3 id="arena-role-title">Elige un legendario que ya tengas</h3>
+        <p id="arena-role-note" class="note" style="margin:4px 0 8px">Sólo aparecen personajes propios de rareza legendaria. No hay límite de jugadores por personaje; el límite futuro será sólo de plazas de la sala.</p>
         <select id="arena-role" class="field"></select>
         <canvas id="arena-role-stage" class="stage" width="180" height="150"></canvas>
         <div id="arena-role-detail" class="arena-role-detail"></div>
         <div class="row" style="gap:8px">
           <button id="arena-join" class="btn gold grow" type="button">Entrar en sala de prueba</button>
-          <button id="arena-online-queue" class="btn ghost grow" type="button" disabled>Buscar jugadores reales</button>
+          <button id="arena-online-queue" class="btn ghost grow" type="button" disabled>Emparejar oponentes</button>
         </div>
       </div>
       <div class="panel arena-room-panel">
-        <div class="row between"><h3>Sala de prueba</h3><b id="arena-count" class="gold">0/8</b></div>
+        <div class="row between"><h3 id="arena-room-title">Sala de prueba</h3><b id="arena-count" class="gold">0/8</b></div>
         <div id="arena-slots" class="arena-slots"></div>
         <div class="row" style="margin-top:12px">
           <button id="arena-start" class="btn gold grow" type="button" disabled>Entrar al combate</button>
           <button id="arena-reset" class="btn small ghost" type="button">Reiniciar</button>
         </div>
         <p id="arena-note" class="note" role="status">Primero selecciona un personaje propio. La sala local usa IA de prueba; el botón de jugadores reales cobra 100 monedas en el servidor al entrar en la cola.</p>
+        <div class="row" style="margin-top:8px;justify-content:flex-end">
+          <button id="arena-exit-setup" class="btn small ghost" type="button">Salir al menú</button>
+        </div>
       </div>
     </div>
     <div id="arena-battle" class="arena-battle hidden">
       <div class="row between">
-        <h3>Combate local</h3>
+        <h3 id="arena-battle-title">Combate local</h3>
         <div class="arena-clock"><span id="arena-phase">Preparación</span> · <b id="arena-timer">00:00</b></div>
       </div>
-      <p class="note" id="arena-battle-note">Velocidad de vista previa ×24 · sala local · entrada 100 monedas · sin tickets amarillos.</p>
+      <p class="note" id="arena-battle-note">Vista previa ×24 · sala local · entrada 100 monedas · sin tickets amarillos.</p>
       <canvas id="arena-canvas" class="arena-canvas" width="720" height="420"></canvas>
       <div id="arena-scoreboard" class="arena-scoreboard"></div>
       <div class="row" style="margin-top:12px">
